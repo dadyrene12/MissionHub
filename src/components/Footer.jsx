@@ -188,7 +188,7 @@ const Footer = ({ handleNavigation }) => {
         <div className="mt-12 pt-8 border-t border-slate-800">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-slate-500 text-sm mb-4 md:mb-0">
-              &copy; {currentYear} Mission Hub. All rights reserved.
+              &copy; {currentYear} Mission Hub. All rights reserved. by Future Innovation HUb
             </p>
             <div className="flex items-center space-x-6">
               <a href="#" className="text-slate-500 hover:text-white text-sm transition-colors duration-300">
