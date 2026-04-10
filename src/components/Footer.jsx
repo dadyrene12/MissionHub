@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Linkedin, Github, Twitter, Phone, Mail, Map, ArrowUp, Send, X, MailOpen } from 'lucide-react';
 
+const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com/api';
+
 const Footer = ({ handleNavigation }) => {
   const [showModal, setShowModal] = useState(false);
   const [email, setEmail] = useState('');
@@ -21,7 +23,7 @@ const Footer = ({ handleNavigation }) => {
     setStatus('');
     
     try {
-      const res = await fetch('/api/newsletter/subscribe', {
+      const res = await fetch(`${API_BASE}/newsletter/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })

@@ -7,6 +7,8 @@ import {
   Settings
 } from 'lucide-react';
 
+const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com/api';
+
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -655,7 +657,7 @@ const InboxPanel = ({
     setUsersError(null);
     
     try {
-      const response = await fetch('/api/messages', {
+      const response = await fetch(`${API_BASE}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -717,7 +719,7 @@ const InboxPanel = ({
           return;
         }
         
-        const response = await fetch('/api/messages', {
+        const response = await fetch(`${API_BASE}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1283,7 +1285,7 @@ const MessageDetailView = ({
         : getUserId(message.fromUserId);
       
       if (recipientId) {
-        const response = await fetch('/api/messages', {
+        const response = await fetch(`${API_BASE}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1388,7 +1390,7 @@ const MessageDetailView = ({
           : getUserId(replyingTo.fromUserId);
         
         // Send the reply as a new message
-        const response = await fetch('/api/messages', {
+        const response = await fetch(`${API_BASE}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2204,7 +2206,7 @@ const NotificationInboxSettingsPanels = ({
     fetchingNotificationsRef.current = true;
     
     try {
-      const response = await fetch('/api/notifications', {
+      const response = await fetch(`${API_BASE}/notifications`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -2237,7 +2239,7 @@ const NotificationInboxSettingsPanels = ({
     fetchingMessagesRef.current = true;
     
     try {
-      const response = await fetch('/api/messages', {
+      const response = await fetch(`${API_BASE}/messages`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -2302,7 +2304,7 @@ const NotificationInboxSettingsPanels = ({
       // If 404 or other error, try alternative endpoint
       if (response.status === 404) {
         // Try filtering from all messages
-        const allMessagesResponse = await fetch('/api/messages', {
+        const allMessagesResponse = await fetch(`${API_BASE}/messages`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -2356,7 +2358,7 @@ const NotificationInboxSettingsPanels = ({
   // Mark all notifications as read
   const markAllNotificationsAsRead = async () => {
     try {
-      const response = await fetch('/api/notifications/read-all', {
+      const response = await fetch(`${API_BASE}/notifications/read-all`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -2468,7 +2470,7 @@ const NotificationInboxSettingsPanels = ({
       
       if (toUserId) {
         // Send as a regular message to the recipient
-        response = await fetch('/api/messages', {
+        response = await fetch(`${API_BASE}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2515,7 +2517,7 @@ const NotificationInboxSettingsPanels = ({
       } else {
         console.error('Failed to send reply, status:', response.status);
         // Try alternative approach - direct message
-        const altResponse = await fetch('/api/messages', {
+        const altResponse = await fetch(`${API_BASE}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

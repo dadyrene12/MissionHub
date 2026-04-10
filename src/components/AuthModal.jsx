@@ -7,7 +7,7 @@ import {
   GraduationCap, Building2, Target, Award, TrendingUp, MessageSquare
 } from 'lucide-react';
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com/api';
 const FALLBACK_API = 'http://localhost:5000/api';
 
 const fetchApi = async (endpoint, options = {}) => {
@@ -52,7 +52,7 @@ const fetchApi = async (endpoint, options = {}) => {
     // Check if backend is reachable - test with quick-test endpoint
     if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('empty response')) {
       try {
-        const testResp = await fetch('/api/quick-test');
+        const testResp = await fetch(`${API_BASE}/quick-test`);
         const testText = await testResp.text();
         console.log('[AuthModal] Backend reachable via proxy:', testText);
       } catch (testErr) {

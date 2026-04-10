@@ -5,12 +5,14 @@ import {
   Send, Camera, Image, CheckCheck, Info, Building
 } from 'lucide-react';
 
+const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com/api';
+
 // Database Service Functions
 class DatabaseService {
   // Jobs Collection
   static async saveJob(jobData) {
     try {
-      const response = await fetch('/api/jobs', {
+      const response = await fetch(`${API_BASE}/jobs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -80,7 +82,7 @@ class DatabaseService {
         formData.append(key, documentData[key]);
       });
 
-      const response = await fetch('/api/documents', {
+      const response = await fetch(`${API_BASE}/documents`, {
         method: 'POST',
         body: formData,
       });
@@ -132,7 +134,7 @@ class DatabaseService {
   // Document Shares Collection
   static async shareDocument(shareData) {
     try {
-      const response = await fetch('/api/document-shares', {
+      const response = await fetch(`${API_BASE}/document-shares`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
