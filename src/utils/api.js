@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.MODE === "development" ? "/api" : 'https://your-production-url.com/api';
+const API_BASE_URL = import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com';
 
 export { API_BASE_URL };
 
