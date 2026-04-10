@@ -92,7 +92,7 @@ export const JobsPage = ({ token, user, showToast, onViewApplicants }) => {
       skills: formData.skills ? formData.skills.split(',').map(s => s.trim()).filter(s => s) : [],
       status: publish ? 'active' : (formData.status || 'draft'),
       remote: formData.remote || false, 
-      urgent: formState.urgent || false,
+      urgent: formData.urgent || false,
       ...(formData.deadline && { deadline: formData.deadline })
     };
 
