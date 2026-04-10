@@ -435,7 +435,7 @@ const App = () => {
 
   // Loader and Pagination States
   const [currentPageIndex, setCurrentPageIndex] = useState(1);
-  const [jobsPerPage, setJobsPerPage] = useState(6);
+  const [jobsPerPage, setJobsPerPage] = useState(3);
   const [displayedJobs, setDisplayedJobs] = useState([]);
 
   const categories = [
@@ -1062,7 +1062,7 @@ const App = () => {
       companyLogo: newJob.company.substring(0, 2).toUpperCase(),
       matchScore: 0,
       applicants: 0,
-      companySize: "Unknown",
+      companySize: "",
       workCulture: "To be determined",
       featured: false,
       image: themes[newJob.category] || themes.office,
@@ -1539,36 +1539,25 @@ const App = () => {
                   {/* Load More Section */}
                   {hasMoreJobs && !isUserTyping && (
                     <div className="mt-12 text-center">
-                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
-                          {displayedJobs.length} Jobs Loaded
-                        </h3>
-                        <p className="text-gray-600 mb-6">
-                          {filteredJobs.length - displayedJobs.length} more amazing opportunities waiting for you!
-                        </p>
+                      <div className="bg-slate-50 rounded-2xl p-8 border border-slate-200">
                         <button
                           onClick={loadMoreJobs}
                           disabled={isLoading}
-                          className="px-8 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center mx-auto space-x-3"
+                          className="px-8 py-4 bg-slate-950 text-white rounded-xl font-bold text-lg hover:bg-slate-900 transition-colors shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center mx-auto space-x-3"
                         >
                           {isLoading ? (
                             <>
                               <Loader2 className="w-5 h-5 animate-spin" />
-                              <span>Loading More Jobs...</span>
+                              <span>Loading...</span>
                             </>
                           ) : (
                             <>
                               <Plus className="w-5 h-5" />
-                              <span>Load More Jobs</span>
+                              <span>Load More ({filteredJobs.length - displayedJobs.length} more)</span>
                               <ChevronDown className="w-5 h-5" />
                             </>
                           )}
                         </button>
-                        <div className="mt-4 flex justify-center items-center space-x-4 text-sm text-gray-500">
-                          <span>Page {currentPageIndex} of {totalPages}</span>
-                          <span>•</span>
-                          <span>{jobsPerPage} jobs per load</span>
-                        </div>
                       </div>
                     </div>
                   )}

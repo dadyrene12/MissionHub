@@ -11,7 +11,7 @@ export const StatCard = ({ icon, number, label, unit = '' }) => (
     </p>
     <p className="text-gray-500 font-medium">{label}</p>
   </div>
-);
+); 
 
 // TestimonialCard
 export const TestimonialCard = ({ testimonial }) => (

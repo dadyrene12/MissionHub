@@ -1,6 +1,6 @@
 // src/App.js
 import React, { useState } from "react";
-import { BrowserRouter as Router, Routes, Route, NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { Menu, X } from "lucide-react"; // install lucide-react for icons
 
 // Install icons if not yet installed:
@@ -116,7 +116,6 @@ const Navbar = () => {
 // ✅ Main App
 function App() {
   return (
-    <Router>
       <Navbar />
       <div className="pt-20">
         <Routes>
@@ -124,7 +123,6 @@ function App() {
           <Route path="/about" element={<About />} />
         </Routes>
       </div>
-    </Router>
   );
 }
 

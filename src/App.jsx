@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { apiRequest } from './utils/api.js';
+import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import JobCard from './components/JobCard';
+import JobFilter from './components/JobFilter';
 import ComparisonTable from './components/ComparisonTable';
 import AboutSection from './components/AboutSection';
 import { UIHelpers } from './components/UIHelpers';
@@ -12,6 +15,7 @@ import ProfilePanel from './components/ProfilePanel';
 import NotificationInboxSettingsPanels from './components/NotificationInboxSettingsPanels';
 import Adverse from './components/adverse';
 import CompanyDashboard from './components/CompanyDashboard';
+
 // Icons
 import {
   Search, MapPin, Bell, User, ChevronDown, Menu, X,
@@ -46,44 +50,26 @@ import {
 
 const { StatCard, TestimonialCard, QuoteIcon } = UIHelpers;
 
-// Helper function to get API base URL safely (Vite uses import.meta.env)
+// Helper function to get API base URL safely
 const getApiBaseUrl = () => {
-  return (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) || '/api';
+  // Use relative path to leverage Vite proxy in dev, or absolute in prod
+  if (import.meta.env.MODE === "development") {
+    return "/api";
+  }
+  return "https://your-production-url.com/api";
 };
 
 // AI Profile-Job Matching Engine
 class ProfileJobMatcher {
   constructor() {
     this.skillWeights = {
-      'JavaScript': 1.0,
-      'React': 1.2,
-      'Node.js': 1.1,
-      'TypeScript': 1.3,
-      'Python': 1.0,
-      'Java': 1.0,
-      'SQL': 0.8,
-      'MongoDB': 0.9,
-      'AWS': 1.1,
-      'Docker': 1.0,
-      'Kubernetes': 1.2,
-      'GraphQL': 1.1,
-      'Redis': 0.8,
-      'Machine Learning': 1.4,
-      'Data Science': 1.3,
-      'UI/UX Design': 0.9,
-      'Agile': 0.7,
-      'Scrum': 0.7,
-      'DevOps': 1.1,
-      'CI/CD': 1.0
+      'JavaScript': 1.0, 'React': 1.2, 'Node.js': 1.1, 'TypeScript': 1.3,
+      'Python': 1.0, 'Java': 1.0, 'SQL': 0.8, 'MongoDB': 0.9,
+      'AWS': 1.1, 'Docker': 1.0, 'Kubernetes': 1.2, 'GraphQL': 1.1
     };
 
     this.experienceLevels = {
-      'entry': 1,
-      'junior': 2,
-      'mid': 3,
-      'senior': 4,
-      'lead': 5,
-      'principal': 6
+      'entry': 1, 'junior': 2, 'mid': 3, 'senior': 4, 'lead': 5, 'principal': 6
     };
   }
 
@@ -299,6 +285,7 @@ const App = () => {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [showDashboard, setShowDashboard] = useState(false);
   const [aboutStats] = useState({
     jobs: 12500,
     companies: 2400,
@@ -313,30 +300,30 @@ const App = () => {
   const [testimonials] = useState([
     {
       id: 1,
-      name: "ish lick",
+      name: "joseph",
       position: "Software Engineer",
-      company: "ishconnect",
+      company: "FUTUREHub inovation",
       content: "Mission hub helped me find my dream job in just 2 weeks! The platform is incredibly user-friendly.",
       rating: 5,
-      avatar: "lk"
+      avatar: "JP"
     },
     {
       id: 2,
       name: "alfu isheja",
       position: "Product Manager",
-      company: "ishconnect",
+      company: "FUtureHub inovation",
       content: "The AI matching system is amazing. It found me opportunities I wouldn't have discovered otherwise.",
       rating: 5,
       avatar: "al"
     },
     {
       id: 3,
-      name: "kevin ishimwe",
+      name: "Dadyrene",
       position: "full stack developer",
-      company: "nestedhub",
+      company: "FUtureHub innovation",
       content: "As a designer, I appreciate the beautiful interface and seamless experience. Highly recommended!",
       rating: 4,
-      avatar: "kv"
+      avatar: "dr"
     }
   ]);
   const [profilePanelOpen, setProfilePanelOpen] = useState(false);
@@ -350,7 +337,6 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [systemReady, setSystemReady] = useState(false);
   const [advertiserNotification, setAdvertiserNotification] = useState(null);
-  const [adNotificationTimer, setAdNotificationTimer] = useState(null);
   
   // User typing state to prevent loader during typing
   const [isUserTyping, setIsUserTyping] = useState(false);
@@ -370,7 +356,7 @@ const App = () => {
     experience: "",
     experienceLevel: "",
     education: "",
-    educationLevel: null, // FIXED: Initialize as null instead of empty string
+    educationLevel: "",
     preferredJobType: "full-time",
     preferredLocation: "",
     salaryExpectation: 0,
@@ -382,7 +368,6 @@ const App = () => {
     languages: [],
     availability: "immediate",
     userType: "jobSeeker",
-    // Backend specific fields
     title: "",
     industry: "",
     company: "",
@@ -447,8 +432,9 @@ const App = () => {
 
   // Loader and Pagination States
   const [currentPageIndex, setCurrentPageIndex] = useState(1);
-  const [jobsPerPage, setJobsPerPage] = useState(1000000);
+  const [jobsPerPage, setJobsPerPage] = useState(3);
   const [displayedJobs, setDisplayedJobs] = useState([]);
+  const [showAllJobs, setShowAllJobs] = useState(false);
 
   const categories = useMemo(() => {
     const list = backendJobs;
@@ -470,7 +456,7 @@ const App = () => {
     interview: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&auto=format&fit=crop&w=2088&q=80'
   };
 
-  // ✅ Fetch jobs from backend
+  // Fetch jobs from backend
   const fetchJobsFromBackend = async () => {
     try {
       const response = await fetch(`${getApiBaseUrl()}/jobs`, {
@@ -481,11 +467,17 @@ const App = () => {
         }
       });
       
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       
-      if (data.success && data.jobs) {
-        // Transform backend jobs to match frontend format
-        const transformedJobs = data.jobs.map(job => ({
+      // Handle both response formats: { success: true, jobs: [] } or { success: true, data: [] }
+      const jobs = data.jobs || data.data || [];
+      
+      if (data.success && jobs.length > 0) {
+        const transformedJobs = jobs.map(job => ({
           id: job._id || job.id,
           title: job.title,
           company: job.company,
@@ -503,7 +495,7 @@ const App = () => {
           companyLogo: job.companyLogo || job.company.substring(0, 2).toUpperCase(),
           matchScore: job.matchScore || 0,
           applicants: job.applicants || 0,
-          companySize: job.companySize || "Unknown",
+          companySize: job.companySize || "",
           workCulture: job.workCulture || "To be determined",
           featured: job.featured || false,
           image: job.image || themes.office,
@@ -524,8 +516,12 @@ const App = () => {
     }
   };
 
-  // ✅ Fetch user applications
+  // Fetch user applications
   const fetchUserApplications = async (userToken) => {
+    if (!userToken) {
+      console.log('No token provided for fetchUserApplications');
+      return;
+    }
     try {
       const response = await fetch(`${getApiBaseUrl()}/applications/my-applications`, {
         method: 'GET',
@@ -535,12 +531,19 @@ const App = () => {
         }
       });
       
-      const data = await response.json();
+      if (!response.ok) {
+        console.log('No applications found or not authorized');
+        return;
+      }
       
-      if (data.success && data.applications) {
-        // jobId may be populated (object) or just an id string; normalize to id string
+      const data = await response.json();
+      console.log('User applications response:', data);
+      
+      if (data.success) {
+        const apps = data.applications || data.data || [];
+        
         const appliedJobIds = new Set(
-          data.applications.map(app => {
+          apps.map(app => {
             const jobRef = app.jobId;
             if (!jobRef) return undefined;
             return typeof jobRef === 'string' ? jobRef : jobRef._id || jobRef.id;
@@ -553,7 +556,7 @@ const App = () => {
     }
   };
 
-  // ✅ Fetch user's posted jobs (for companies)
+  // Fetch user's posted jobs (for companies)
   const fetchUserJobs = async (userToken) => {
     try {
       const response = await fetch(`${getApiBaseUrl()}/jobs/my-jobs`, {
@@ -564,10 +567,14 @@ const App = () => {
         }
       });
       
+      if (!response.ok) {
+        console.log('No jobs posted by user or not authorized');
+        return;
+      }
+      
       const data = await response.json();
       
       if (data.success && data.jobs) {
-        // Store user's jobs in state if needed
         console.log('User jobs:', data.jobs);
       }
     } catch (error) {
@@ -575,7 +582,7 @@ const App = () => {
     }
   };
 
-  // ✅ Fetch company applications (for companies)
+  // Fetch company applications (for companies)
   const fetchCompanyApplications = async (userToken) => {
     try {
       const response = await fetch(`${getApiBaseUrl()}/applications/for-my-jobs`, {
@@ -585,6 +592,11 @@ const App = () => {
           'Authorization': `Bearer ${userToken}`
         }
       });
+      
+      if (!response.ok) {
+        console.log('No company applications found');
+        return;
+      }
       
       const data = await response.json();
       
@@ -596,19 +608,20 @@ const App = () => {
     }
   };
 
-  // ✅ Fetch notifications from backend
+  // Fetch notifications from backend
   const fetchNotifications = async (userToken) => {
     try {
       const res = await fetch(`${getApiBaseUrl()}/notifications`, {
         headers: { 'Authorization': `Bearer ${userToken}` }
       });
+      
       if (!res.ok) {
-        // Gracefully handle missing route or unauthorized without spamming errors
         if (res.status !== 404) {
           console.error('Notifications fetch failed with status', res.status);
         }
         return;
       }
+      
       const data = await res.json();
       if (data.success && Array.isArray(data.notifications)) {
         setNotifications(data.notifications);
@@ -618,18 +631,20 @@ const App = () => {
     }
   };
 
-  // ✅ Fetch messages (inbox + sent) from backend
+  // Fetch messages (inbox + sent) from backend
   const fetchMessages = async (userToken) => {
     try {
       const res = await fetch(`${getApiBaseUrl()}/messages`, {
         headers: { 'Authorization': `Bearer ${userToken}` }
       });
+      
       if (!res.ok) {
         if (res.status !== 404) {
           console.error('Messages fetch failed with status', res.status);
         }
         return;
       }
+      
       const data = await res.json();
       if (data.success) {
         const combined = [
@@ -643,17 +658,19 @@ const App = () => {
     }
   };
 
-  // ✅ Send a message to a user (used by CompanyDashboard)
+  // Send a message to a user (used by CompanyDashboard)
   const sendMessageToUser = async ({ toUserId, jobId, applicationId, body, subject = '' }) => {
     if (!token) {
       showNotification('Please log in to send messages.', 'warning');
       setLoginOpen(true);
       return;
     }
+    
     if (!toUserId || !body) {
       showNotification('Recipient and message body are required', 'error');
       return;
     }
+    
     try {
       const res = await fetch(`${getApiBaseUrl()}/messages`, {
         method: 'POST',
@@ -663,7 +680,9 @@ const App = () => {
         },
         body: JSON.stringify({ toUserId, jobId, applicationId, subject, body })
       });
+      
       const data = await res.json();
+      
       if (data.success) {
         showNotification('Message sent', 'success');
         fetchMessages(token);
@@ -677,9 +696,11 @@ const App = () => {
     }
   };
 
-  // ✅ Fetch initial data
+  // Fetch initial data
   const fetchInitialData = async (userToken) => {
     try {
+      setIsLoading(true);
+      
       const jobsPromise = fetchJobsFromBackend();
       const appsPromise = userToken ? fetchUserApplications(userToken) : Promise.resolve();
       const notifsPromise = userToken ? fetchNotifications(userToken) : Promise.resolve();
@@ -694,80 +715,107 @@ const App = () => {
         companyAppsPromise
       ]);
       
-      // Use backend jobs only; display all jobs
-      setDisplayedJobs(backendJobsData);
+      setDisplayedJobs(backendJobsData || []);
       
       setTimeout(() => {
         setIsLoading(false);
         setSystemReady(true);
         showNotification(`Welcome back, ${user?.name || 'User'}!`, 'success');
-      }, 1000);
+      }, 300);
+      
     } catch (error) {
       console.error('Error fetching initial data:', error);
       setDisplayedJobs([]);
       setIsLoading(false);
       setSystemReady(true);
+      showNotification('System loaded with limited functionality', 'warning');
     }
   };
 
-  // ✅ Check for existing token and load data on app load
+  // Check for existing token and load data on app load
   useEffect(() => {
     const storedToken = localStorage.getItem('token') || sessionStorage.getItem('token');
     const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
     
     if (storedToken && storedUser) {
-      setToken(storedToken);
-      const userData = JSON.parse(storedUser);
-      setUser(userData);
-      
-      // ✅ Safe update of user profile
-      setUserProfile(prev => ({
-        ...prev,
-        name: userData?.name || "",
-        email: userData?.email || "",
-        userType: userData?.userType || "jobSeeker",
-        // FIXED: Handle nested profile data safely
-        ...(userData.personalInfo || {}),
-        ...(userData.professionalInfo || {})
-      }));
-      
-      // Fetch jobs and user data
-      fetchInitialData(storedToken);
-    } else {
-      // Load jobs for guests as well
-      (async () => {
-        const data = await fetchJobsFromBackend();
-        setDisplayedJobs(data);
+      try {
+        setToken(storedToken);
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        
+        setUserProfile(prev => ({
+          ...prev,
+          name: userData?.name || "",
+          email: userData?.email || "",
+          userType: userData?.userType || "jobSeeker",
+          profile: userData?.profile || {},
+          ...(userData.personalInfo || {}),
+          ...(userData.professionalInfo || {})
+        }));
+        
+        // Fetch full profile with resume
+        fetch(`${getApiBaseUrl()}/users/me`, {
+          headers: { 'Authorization': `Bearer ${storedToken}` }
+        })
+        .then(res => res.json())
+        .then(profileData => {
+          if (profileData.success && profileData.data) {
+            setUserProfile(prev => ({
+              ...prev,
+              ...profileData.data,
+              profile: profileData.data.profile || {}
+            }));
+          }
+        })
+        .catch(console.error);
+        
+        // Navigate to dashboard if user is company
+        if (userData?.userType === 'company') {
+          setShowDashboard(true);
+        }
+        
+        // Fetch initial data (backend creates notifications in database for new users)
+        fetchInitialData(storedToken);
+      } catch (error) {
+        console.error('Error parsing stored user data:', error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
         setIsLoading(false);
         setSystemReady(true);
-        showNotification('Welcome to Mission Hub! Browse jobs and log in to apply.', 'info');
+      }
+    } else {
+      (async () => {
+        try {
+          const data = await fetchJobsFromBackend();
+          setDisplayedJobs(data || []);
+          setIsLoading(false);
+          setSystemReady(true);
+          showNotification('Welcome to Mission Hub! Browse jobs and log in to apply.', 'info');
+        } catch (error) {
+          console.error('Error loading initial jobs:', error);
+          setIsLoading(false);
+          setSystemReady(true);
+        }
       })();
     }
   }, []);
 
-  // ✅ System Loader Effect
+  // System Loader Effect
   useEffect(() => {
     if (!token) {
       const timer = setTimeout(() => {
         setIsLoading(false);
         setSystemReady(true);
         showNotification('System loaded successfully! Welcome to Mission Hub.', 'success');
-      }, 2000);
+      }, 500);
 
       return () => clearTimeout(timer);
     }
   }, [token]);
 
-  // Disable advertiser notifications
-  useEffect(() => {
-    return () => {
-      if (adNotificationTimer) {
-        clearInterval(adNotificationTimer);
-      }
-    };
-  }, [adNotificationTimer]);
-
-  // ✅ Handle user typing to prevent loader
+  // Handle user typing to prevent loader
   const handleUserTyping = (field, value) => {
     setIsUserTyping(true);
     
@@ -788,57 +836,7 @@ const App = () => {
     }
   };
 
-  // ✅ Start advertiser notifications
-  const startAdvertiserNotifications = () => {
-    const showAdNotification = () => {
-      const adNotifications = [
-        {
-          id: Date.now(),
-          title: "🚀 Premium Feature Available!",
-          message: "Upgrade to Premium for unlimited job applications and AI-powered resume analysis!",
-          type: "premium",
-          action: "Upgrade Now",
-          duration: 6000
-        },
-        {
-          id: Date.now() + 1,
-          title: "📈 Boost Your Profile Visibility",
-          message: "Get 3x more profile views by completing your skills assessment!",
-          type: "profile",
-          action: "Take Assessment",
-          duration: 6000
-        }
-      ];
-
-      const randomAd = adNotifications[Math.floor(Math.random() * adNotifications.length)];
-      setAdvertiserNotification(randomAd);
-
-      setTimeout(() => {
-        setAdvertiserNotification(null);
-      }, randomAd.duration);
-    };
-
-    const timer = setTimeout(() => {
-      showAdNotification();
-      
-      const interval = setInterval(showAdNotification, 180000);
-      setAdNotificationTimer(interval);
-    }, 120000);
-
-    return () => {
-      clearTimeout(timer);
-      if (adNotificationTimer) {
-        clearInterval(adNotificationTimer);
-      }
-    };
-  };
-
-  // ✅ Close advertiser notification
-  const closeAdvertiserNotification = () => {
-    setAdvertiserNotification(null);
-  };
-
-  // ✅ ENHANCED: Apply for job with comprehensive backend integration
+  // Apply for job with comprehensive backend integration
   const applyForJob = async (jobId, applicationData = {}) => {
     if (!user) {
       showNotification('Please log in to apply for a job.', 'warning');
@@ -853,7 +851,6 @@ const App = () => {
     }
     
     try {
-      // Run AI analysis before applying if enabled
       if (userSettings.aiMatching) {
         const matchResult = aiMatcher.calculateMatch(userProfile, job);
         const gaps = aiMatcher.analyzeProfileGaps(userProfile, job);
@@ -863,10 +860,11 @@ const App = () => {
           [jobId]: matchResult
         }));
 
-        // No local notifications
+        if (matchResult.overallScore < 50) {
+          showNotification(`Low match score (${matchResult.overallScore}%). Consider improving your profile.`, 'warning');
+        }
       }
 
-      // Submit application to backend
       const response = await fetch(`${getApiBaseUrl()}/applications`, {
         method: 'POST',
         headers: {
@@ -875,14 +873,15 @@ const App = () => {
         },
         body: JSON.stringify({
           jobId,
-          jobTitle: job.title,
-          company: job.company,
           coverLetter: applicationData.coverLetter || '',
-          resume: userProfile.resume,
-          answers: applicationData.answers || [],
-          ...applicationData
+          resume: userProfile.resume
         })
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit application');
+      }
       
       const data = await response.json();
       
@@ -892,22 +891,58 @@ const App = () => {
         setAppliedJobs(newAppliedJobs);
         
         showNotification(`Application submitted for ${job.title} at ${job.company}!`, 'success');
-        
-        // Refresh applications list
         fetchUserApplications(token);
       } else {
         showNotification(data.message || 'Failed to submit application', 'error');
       }
     } catch (error) {
       console.error('Error submitting application:', error);
-      showNotification('Network error. Please try again.', 'error');
+      showNotification(error.message || 'Network error. Please try again.', 'error');
     }
   };
 
-  // ✅ FIXED: Enhanced filtered jobs with AI scoring and safe access (backend only)
+  // Contact company - send message
+  const contactCompany = async (job) => {
+    if (!user) {
+      showNotification('Please log in to contact the company.', 'warning');
+      setLoginOpen(true);
+      return;
+    }
+
+    const messageSubject = `Inquiry about ${job.title} position`;
+    const messageBody = `Hi,\n\nI'm interested in the ${job.title} position at ${job.company} and would like to learn more about the opportunity.\n\nThank you for your time!`;
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          toUserId: job.postedBy,
+          subject: messageSubject,
+          body: messageBody,
+          jobId: job.id
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showNotification(`Message sent to ${job.company}! Check your email for confirmation.`, 'success');
+      } else {
+        showNotification(data.message || 'Failed to send message', 'error');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      showNotification('Failed to send message. Please try again.', 'error');
+    }
+  };
+
+  // Enhanced filtered jobs with AI scoring and safe access
   const filteredJobs = useMemo(() => {
-    // Use backend jobs only
-    const jobsToFilter = backendJobs;
+    const jobsToFilter = backendJobs || [];
     
     const baseFiltered = jobsToFilter.filter(job => {
       const matchesCategory = activeCategory === 'all' || job.category === activeCategory;
@@ -925,7 +960,6 @@ const App = () => {
              matchesSalary && matchesRemote && matchesQuery;
     });
 
-    // Apply AI matching if enabled
     if (userSettings.aiMatching && user) {
       return baseFiltered
         .map(job => {
@@ -945,36 +979,16 @@ const App = () => {
     return baseFiltered;
   }, [backendJobs, activeCategory, activeFilters, searchQuery, locationQuery, userSettings.aiMatching, user, userProfile]);
 
-  // ✅ Load more jobs function
+  // Load more jobs function
   const loadMoreJobs = async () => {
-    setIsLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Show all jobs: no-op
+    setShowAllJobs(true);
     setDisplayedJobs(filteredJobs);
-    setIsLoading(false);
   };
 
-  // ✅ Reset pagination when filters change
-  useEffect(() => {
-    if (isUserTyping) return;
-    
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setDisplayedJobs(filteredJobs);
-      setCurrentPageIndex(1);
-      setIsLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [filteredJobs, jobsPerPage, isUserTyping]);
-
-  // ✅ Check if there are more jobs to load
-  const hasMoreJobs = false;
+  const hasMoreJobs = !showAllJobs && filteredJobs.length > jobsPerPage;
   const totalPages = 1;
 
-  // ✅ Auto-analyze profile when it changes
+  // Auto-analyze profile when it changes
   useEffect(() => {
     if (user && userSettings.aiMatching) {
       analyzeProfileForImprovements();
@@ -982,7 +996,9 @@ const App = () => {
   }, [userProfile, userSettings.aiMatching, user]);
 
   const analyzeProfileForImprovements = () => {
-    const allJobs = filteredJobs.slice(0, 10);
+    const allJobs = (filteredJobs || []).slice(0, 10);
+    if (allJobs.length === 0) return;
+    
     let totalScore = 0;
     let improvementAreas = new Set();
     
@@ -1005,28 +1021,15 @@ const App = () => {
       improvementAreas: Array.from(improvementAreas),
       lastAnalyzed: new Date()
     });
-
-    if (averageScore < 60 && improvementAreas.size > 0) {
-      const improvementNotification = {
-        id: Date.now(),
-        title: "📈 Profile Improvement Needed",
-        message: `Your profile has an average ${averageScore}% match with jobs. Consider working on: ${Array.from(improvementAreas).slice(0, 2).join(', ')}`,
-        read: false,
-        date: "Just now",
-        type: "profile_improvement",
-        priority: "medium"
-      };
-      setNotifications(prev => [improvementNotification, ...prev]);
-    }
   };
 
-  // ✅ Show notification function
+  // Show notification function
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type, id: Date.now() });
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // ✅ Toggle bookmark function
+  // Toggle bookmark function
   const toggleBookmark = (jobId) => {
     const newBookmarks = new Set(bookmarkedJobs);
     if (newBookmarks.has(jobId)) {
@@ -1039,7 +1042,7 @@ const App = () => {
     setBookmarkedJobs(newBookmarks);
   };
 
-  // ✅ Toggle comparison function
+  // Toggle comparison function
   const toggleComparison = (job) => {
     if (!job) return;
     
@@ -1059,12 +1062,13 @@ const App = () => {
     }
   };
 
-  // ✅ Toggle voice search function
+  // Toggle voice search function
   const toggleVoiceSearch = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       showNotification('Voice search is not supported by your browser.', 'error');
       return;
     }
+    
     if (!isListening) {
       setIsListening(true);
       showNotification('Listening... Speak now', 'info');
@@ -1081,9 +1085,10 @@ const App = () => {
     }
   };
 
-  // ✅ Send chat message function
+  // Send chat message function
   const sendMessage = () => {
     if (!newMessage.trim()) return;
+    
     const userMessage = {
       id: chatMessages.length + 1,
       text: newMessage,
@@ -1091,23 +1096,11 @@ const App = () => {
       timestamp: new Date(),
       status: 'sent'
     };
+    
     setChatMessages(prev => [...prev, userMessage]);
     setNewMessage('');
     setAiThinking(true);
-    setTimeout(() => {
-      setChatMessages(prev => 
-        prev.map(msg => 
-          msg.id === userMessage.id ? { ...msg, status: 'delivered' } : msg
-        )
-      );
-    }, 500);
-    setTimeout(() => {
-      setChatMessages(prev => 
-        prev.map(msg => 
-          msg.id === userMessage.id ? { ...msg, status: 'read' } : msg
-        )
-      );
-    }, 1000);
+    
     setTimeout(() => {
       const responses = [
         "I found several positions matching your criteria. Would you like me to show you the top matches?",
@@ -1115,6 +1108,7 @@ const App = () => {
         "I can help you refine your search. What specific skills are you looking to use?",
         "Great! I've updated your job preferences. Let me find the perfect matches for you."
       ];
+      
       const aiResponse = {
         id: chatMessages.length + 2,
         text: responses[Math.floor(Math.random() * responses.length)],
@@ -1122,149 +1116,103 @@ const App = () => {
         timestamp: new Date(),
         status: 'delivered'
       };
+      
       setChatMessages(prev => [...prev, aiResponse]);
       setAiThinking(false);
     }, 2000);
   };
 
-  // ✅ ENHANCED: Login handler with proper backend integration and safe access
+  // Login handler
   const handleLogin = async (loginData) => {
     try {
-      setIsLoading(true);
-      
-      const response = await fetch(`${getApiBaseUrl()}/auth/login`, {
+      console.log('📤 Sending login request:', loginData.email);
+      const data = await apiRequest('/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        body: {
           email: loginData.email,
           password: loginData.password
-        }),
+        }
       });
       
-      const data = await response.json();
+      console.log('📥 Login response:', data);
       
-      if (response.ok && data.success) {
-        // Store token based on remember me preference
-        if (loginData.rememberMe) {
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('user', JSON.stringify(data.user));
-        } else {
-          sessionStorage.setItem('token', data.token);
-          sessionStorage.setItem('user', JSON.stringify(data.user));
-        }
+      if (data.success) {
+        console.log('✅ Login successful!');
+        const storage = loginData.rememberMe ? localStorage : sessionStorage;
+        storage.setItem('token', data.token);
+        storage.setItem('user', JSON.stringify(data.user));
         
         setUser(data.user);
         setToken(data.token);
         
-        // ✅ Safe profile update with backend data
         setUserProfile(prev => ({
           ...prev,
-          // FIXED: Handle nested profile data safely
           ...(data.user.personalInfo || {}),
           ...(data.user.professionalInfo || {}),
           name: data.user?.name || "",
           email: data.user?.email || "",
-          userType: data.user?.userType || "jobSeeker"
+          userType: data.user?.userType || "jobSeeker",
+          profile: data.user?.profile || {}
         }));
         
         setLoginOpen(false);
-        showNotification('Successfully logged in!', 'success');
         
-        // Fetch user's jobs and applications
-        fetchUserJobs(data.token);
-        fetchUserApplications(data.token);
-        
-        // Fetch company applications if user is a company
+        // Navigate to dashboard for company users only
         if (data.user.userType === 'company') {
-          fetchCompanyApplications(data.token);
+          console.log('🏢 Company user - showing dashboard');
+          setShowDashboard(true);
+          // Company dashboard will fetch its own data asynchronously
+        } else {
+          // Fetch user data in background for non-company users
+          fetchUserJobs(data.token).catch(console.error);
+          fetchUserApplications(data.token).catch(console.error);
         }
         
-        const newNotification = {
-          id: Date.now(),
-          title: "Welcome back!",
-          message: "You have 3 new job matches and 2 unread messages.",
-          read: false,
-          date: "Just now",
-          type: "message"
-        };
-        setNotifications(prev => [newNotification, ...prev]);
+        // Show welcome message (backend now creates notifications in database)
+        showNotification(`Welcome, ${data.user.name}!`, 'success');
+        
+        return { success: true, user: data.user };
       } else {
-        // Better guidance on common 401: unverified email
-        const msg = data?.message || data?.error || 'Login failed';
-        if (response.status === 401 && /verify/i.test(msg)) {
-          showNotification('Please verify your email. We sent a 6-digit code during registration (check backend console in dev).', 'warning');
-          // Optionally, open register modal to surface verification UI
-          setRegisterOpen(true);
-        } else {
-          showNotification(msg, 'error');
-        }
+        console.log('❌ Login failed:', data.message);
+        const msg = data?.message || 'Login failed';
+        throw new Error(msg);
       }
     } catch (error) {
-      console.error('Login error:', error);
-      showNotification('Network error. Please check if the backend server is running.', 'error');
-    } finally {
-      setIsLoading(false);
+      console.error('❌ Login error:', error);
+      throw error;
     }
   };
 
-  // ✅ ENHANCED: Register handler with proper backend integration
+  // Register handler
   const handleRegister = async (registerData) => {
     try {
       setIsLoading(true);
       
-      const response = await fetch(`${getApiBaseUrl()}/auth/register`, {
+      const data = await apiRequest('/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        body: {
           name: registerData.name,
           email: registerData.email,
           password: registerData.password,
-          userType: registerData.userType || 'jobSeeker',
-          personalInfo: {
-            location: registerData.location || "",
-            phone: registerData.phone || ""
-          },
-          professionalInfo: {
-            title: registerData.title || "",
-            industry: registerData.industry || "",
-            experience: registerData.experience || "",
-            educationLevel: registerData.educationLevel || null // FIXED: Use null instead of empty string
-          }
-        }),
+          userType: registerData.userType || 'jobSeeker'
+        }
       });
       
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        showNotification('Registration successful! Please check your email for verification.', 'success');
-        
-        // Auto-login if autoLogin is enabled
-        if (registerData.autoLogin) {
-          handleLogin({
-            email: registerData.email,
-            password: registerData.password,
-            rememberMe: true
-          });
-        }
-        
+      if (data.success) {
+        showNotification('Registration successful! Check console/email for verification code.', 'success');
         setRegisterOpen(false);
-        
       } else {
-        showNotification(data.message || data.error || 'Registration failed', 'error');
+        showNotification(data.message || 'Registration failed', 'error');
       }
     } catch (error) {
       console.error('Registration error:', error);
-      showNotification('Network error. Please check if the backend server is running.', 'error');
+      showNotification(error.message || 'Network error. Please check if the backend server is running.', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ✅ Handle post job click
+  // Handle post job click
   const handlePostJobClick = () => {
     if (!user) {
       showNotification('Please log in to post a job', 'warning');
@@ -1276,37 +1224,39 @@ const App = () => {
     }
   };
 
-  // ✅ Handle image upload
-  const handleImageUpload = (file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      // Persist as base64 data URL so backend can store it in Mongo
-      handleNewJobChange('image', reader.result);
-      showNotification('Image uploaded successfully!', 'success');
-    };
-    reader.onerror = () => {
-      showNotification('Failed to read image file', 'error');
-    };
-    reader.readAsDataURL(file);
+  // Handle image upload
+  const handleImageUpload = async (file) => {
+    if (!file || !token) return;
+    
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/upload/profile-photo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        showNotification('Profile photo uploaded successfully!', 'success');
+        setUserProfile(prev => ({ ...prev, profilePhoto: data.imageUrl }));
+      } else {
+        showNotification('Failed to upload image', 'error');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      showNotification('Network error during image upload', 'error');
+    }
   };
 
-  // ✅ ENHANCED: Logout handler with backend integration
+  // Logout handler
   const handleLogout = async () => {
     try {
-      // Call logout endpoint if available
-      if (token) {
-        await fetch(`${getApiBaseUrl()}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          credentials: 'include'
-        });
-      }
-      
-      // Clear local storage
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       sessionStorage.removeItem('token');
@@ -1314,42 +1264,42 @@ const App = () => {
       
       setUser(null);
       setToken(null);
+      setShowDashboard(false);
       setProfileDropdownOpen(false);
       showNotification('You have been logged out', 'info');
       
-      // Clear advertiser notifications on logout
-      if (adNotificationTimer) {
-        clearInterval(adNotificationTimer);
-        setAdNotificationTimer(null);
-      }
-      setAdvertiserNotification(null);
+      setAppliedJobs(new Set());
+      setCompanyApplications([]);
+      setNotifications([]);
+      setMessages([]);
+      
     } catch (error) {
       console.error('Logout error:', error);
-      // Still logout locally even if backend call fails
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
       setUser(null);
       setToken(null);
+      setShowDashboard(false);
       setProfileDropdownOpen(false);
       showNotification('You have been logged out', 'info');
     }
   };
 
-  // ✅ Change theme function
+  // Change theme function
   const changeTheme = (theme) => {
     setCurrentTheme(theme);
     showNotification(`Theme changed to ${theme}`, 'info');
   };
 
-  // ✅ Clear all filters function
+  // Clear all filters function
   const clearAllFilters = () => {
     setActiveFilters({
       category: 'all',
       type: '',
       experience: '',
-      salary: 50000,
+      salary: 0,
       location: '',
       remote: false
     });
@@ -1359,7 +1309,7 @@ const App = () => {
     showNotification('All filters cleared', 'info');
   };
 
-  // ✅ Handle navigation function
+  // Handle navigation function
   const handleNavigation = (page) => {
     setCurrentPage(page);
     setMobileMenuOpen(false);
@@ -1367,23 +1317,23 @@ const App = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // ✅ Handle AI assistant function
+  // Handle AI assistant function
   const handleAIAssistant = () => {
     setAiAssistantThinking(true);
     setTimeout(() => {
       setAiAssistantThinking(false);
-      showNotification('AI Assistant: Based on your profile, I found 3 new job matches!', 'success');
+      showNotification('AI Assistant: Based on your profile, I found some job matches!', 'success');
       setJobAlertBannerOpen(true);
       setTimeout(() => setJobAlertBannerOpen(false), 5000);
     }, 2000);
   };
 
-  // ✅ Toggle job details function
+  // Toggle job details function
   const toggleJobDetails = (jobId) => {
     setExpandedJobId(expandedJobId === jobId ? null : jobId);
   };
 
-  // ✅ Handle filter change function
+  // Handle filter change function
   const handleFilterChange = (filterName, value) => {
     setActiveFilters(prev => ({
       ...prev,
@@ -1391,14 +1341,14 @@ const App = () => {
     }));
   };
 
-  // ✅ Handle category filter function
+  // Handle category filter function
   const handleCategoryFilter = (categoryId) => {
     setActiveCategory(categoryId);
     setExpandedJobId(null);
     showNotification(`Filtering by ${categories.find(c => c.id === categoryId)?.name || 'category'}`, 'info');
   };
 
-  // ✅ Handle new job change function
+  // Handle new job change function
   const handleNewJobChange = (field, value) => {
     setNewJob(prev => ({
       ...prev,
@@ -1406,9 +1356,10 @@ const App = () => {
     }));
   };
 
-  // ✅ ENHANCED: Handle post job function with backend integration
+  // Handle post job function with backend integration
   const handlePostJob = async (e) => {
     e.preventDefault();
+    
     if (!newJob.title || !newJob.company || !newJob.location || !newJob.description) {
       showNotification('Please fill in all required fields', 'error');
       return;
@@ -1437,18 +1388,13 @@ const App = () => {
           urgent: newJob.urgent,
           contactEmail: newJob.contactEmail,
           contactPhone: newJob.contactPhone,
-          applicationUrl: newJob.applicationUrl,
-          image: newJob.image || '',
-          skills: newJob.skills || [],
-          salaryMin: newJob.salaryMin || 0,
-          salaryMax: newJob.salaryMax || 0
+          applicationUrl: newJob.applicationUrl
         }),
       });
       
       const data = await response.json();
       
       if (data.success) {
-        // Add the new job to local state
         const jobToAdd = {
           id: data.job._id || data.job.id,
           title: newJob.title,
@@ -1464,24 +1410,22 @@ const App = () => {
           benefits: newJob.benefits?.split(',').map(b => b.trim()) || [],
           remote: newJob.remote,
           urgent: newJob.urgent,
-          image: newJob.image || '',
           companyLogo: newJob.company.substring(0, 2).toUpperCase(),
           matchScore: 0,
           applicants: 0,
-          companySize: "Unknown",
+          companySize: "",
           workCulture: "To be determined",
           featured: false,
           image: themes[newJob.category] || themes.office,
           posted: "Just now",
-          skills: newJob.skills || [],
-          salaryMin: newJob.salaryMin || 0,
-          salaryMax: newJob.salaryMax || 0
+          skills: [],
+          salaryMin: 0,
+          salaryMax: 0,
+          postedBy: user?._id || user?.id
         };
         
-        // Add to beginning of backend jobs array
         setBackendJobs(prev => [jobToAdd, ...prev]);
         
-        // Reset form
         setNewJob({
           title: '',
           company: '',
@@ -1504,15 +1448,6 @@ const App = () => {
         setPostJobOpen(false);
         showNotification('Job posted successfully!', 'success');
         
-        const newNotification = {
-          id: Date.now(),
-          title: "New job posted",
-          message: `Your job listing for ${jobToAdd.title} is now live.`,
-          read: false,
-          date: "Just now",
-          type: "job"
-        };
-        setNotifications(prev => [newNotification, ...prev]);
       } else {
         showNotification(data.message || 'Failed to post job', 'error');
       }
@@ -1522,160 +1457,197 @@ const App = () => {
     }
   };
 
-  // ✅ Handle file upload function
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowedTypes.includes(file.type)) {
-      showNotification('Please upload a PDF or Word document', 'error');
+  // Handle add document
+  const handleAddDocument = async (file, type) => {
+    if (!file) {
+      showNotification('Please select a file', 'warning');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showNotification('File size must be less than 5MB', 'error');
-      return;
-    }
-    setUploadedFile(file);
-    showNotification('File uploaded successfully', 'success');
+    
+    const newDoc = {
+      id: Date.now(),
+      name: file.name,
+      type: type || 'other',
+      size: (file.size / 1024).toFixed(1) + ' KB',
+      uploadDate: new Date().toISOString().split('T')[0],
+      shared: false,
+      file: file
+    };
+    
+    setUserDocuments(prev => [newDoc, ...prev]);
+    showNotification(`${file.name} added successfully`, 'success');
   };
 
-  // ✅ Handle add document function
-  const handleAddDocument = (documentData) => {
-    setUserDocuments(prev => [...prev, documentData]);
-    showNotification('Document added successfully', 'success');
-  };
-
-  // ✅ Handle toggle document share function
+  // Handle toggle document share
   const handleToggleDocumentShare = (docId) => {
-    setUserDocuments(prev => 
-      prev.map(doc => 
-        doc.id === docId ? { ...doc, shared: !doc.shared } : doc
-      )
-    );
-    showNotification('Document sharing status updated', 'success');
+    setUserDocuments(prev => prev.map(doc => {
+      if (doc.id === docId) {
+        const newShared = !doc.shared;
+        showNotification(`Document ${newShared ? 'shared' : 'unshared'} successfully`, 'success');
+        return { ...doc, shared: newShared };
+      }
+      return doc;
+    }));
   };
 
-  // ✅ Handle delete document function
+  // Handle delete document
   const handleDeleteDocument = (docId) => {
-    setUserDocuments(prev => prev.filter(doc => doc.id !== docId));
-    showNotification('Document deleted', 'info');
+    if (window.confirm('Are you sure you want to delete this document?')) {
+      setUserDocuments(prev => prev.filter(doc => doc.id !== docId));
+      showNotification('Document deleted successfully', 'success');
+    }
   };
 
-  // ✅ Handle preview document function
+  // Handle preview document
   const handlePreviewDocument = (doc) => {
     setDocumentPreview(doc);
+    showNotification(`Previewing: ${doc.name}`, 'info');
   };
 
-  // ✅ Mark notification as read function
-  const markNotificationAsRead = async (id) => {
+  // Mark notification as read
+  const markNotificationAsRead = async (notificationId) => {
     try {
-      await fetch(`${getApiBaseUrl()}/notifications/${id}/read`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      setNotifications(prev => prev.map(n => (n._id === id || n.id === id) ? { ...n, read: true } : n));
-    } catch (e) {
-      console.error('Error marking notification read:', e);
+      if (token) {
+        await fetch(`${getApiBaseUrl()}/notifications/${notificationId}/read`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      setNotifications(prev => prev.map(n => 
+        n.id === notificationId ? { ...n, read: true } : n
+      ));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
     }
   };
 
-  // ✅ Mark all notifications as read function
+  // Mark all notifications as read
   const markAllNotificationsAsRead = async () => {
     try {
-      await fetch(`${getApiBaseUrl()}/notifications/read-all`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      if (token) {
+        await fetch(`${getApiBaseUrl()}/notifications/read-all`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       showNotification('All notifications marked as read', 'success');
-    } catch (e) {
-      console.error('Error marking all notifications read:', e);
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
     }
   };
 
-  // ✅ Delete notification function
-  const deleteNotification = async (id) => {
+  // Delete notification
+  const deleteNotification = async (notificationId) => {
     try {
-      await fetch(`${getApiBaseUrl()}/notifications/${id}`, {
-        method: 'DELETE',
+      if (token) {
+        await fetch(`${getApiBaseUrl()}/notifications/${notificationId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      showNotification('Notification deleted', 'success');
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  };
+
+  // Mark message as read
+  const markMessageAsRead = async (messageId) => {
+    try {
+      if (token) {
+        await fetch(`${getApiBaseUrl()}/messages/${messageId}/read`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      setMessages(prev => prev.map(m => 
+        m.id === messageId || m._id === messageId ? { ...m, read: true } : m
+      ));
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
+  };
+
+  // Delete message
+  const deleteMessage = async (messageId) => {
+    try {
+      if (token) {
+        await fetch(`${getApiBaseUrl()}/messages/${messageId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      setMessages(prev => prev.filter(m => m.id !== messageId && m._id !== messageId));
+      showNotification('Message deleted', 'success');
+    } catch (error) {
+      console.error('Error deleting message:', error);
+    }
+  };
+
+  // Fetch conversation with a specific user
+  const fetchConversation = async (otherUserId) => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/messages/${otherUserId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      setNotifications(prev => prev.filter(n => (n._id || n.id) !== id));
-      showNotification('Notification deleted', 'info');
-    } catch (e) {
-      console.error('Error deleting notification:', e);
+      if (response.ok) {
+        const data = await response.json();
+        return { success: true, messages: data.data || [] };
+      }
+      return { success: false, messages: [] };
+    } catch (error) {
+      console.error('Error fetching conversation:', error);
+      return { success: false, messages: [] };
     }
   };
 
-  // ✅ Mark message as read function
-  const markMessageAsRead = async (id) => {
-    try {
-      await fetch(`${getApiBaseUrl()}/messages/${id}/read`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      setMessages(prev => prev.map(m => (m._id === id || m.id === id) ? { ...m, read: true } : m));
-    } catch (e) {
-      console.error('Error marking message read:', e);
-    }
-  };
-
-  // ✅ Delete message function
-  const deleteMessage = (id) => {
-    // No backend delete route yet; just remove locally
-    setMessages(prev => prev.filter(m => (m._id || m.id) !== id));
-    if (selectedMessage && (selectedMessage._id === id || selectedMessage.id === id)) {
-      setSelectedMessage(null);
-    }
-    showNotification('Message deleted', 'info');
-  };
-
-  // ✅ Send message reply function
+  // Send message reply
   const sendMessageReply = async () => {
     if (!messageReply.trim() || !selectedMessage) return;
+    
     try {
-      const toUserId = selectedMessage.fromUserId?._id || selectedMessage.fromUserId || selectedMessage.toUserId?._id || selectedMessage.toUserId;
-      const jobId = selectedMessage.jobId?._id || selectedMessage.jobId;
-      const applicationId = selectedMessage.applicationId?._id || selectedMessage.applicationId;
-      const res = await fetch(`${getApiBaseUrl()}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ toUserId, jobId, applicationId, body: messageReply, subject: selectedMessage.subject || '' })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showNotification('Reply sent successfully', 'success');
-        setMessageReply('');
-        // Refresh inbox quickly
-        fetchMessages(token);
-        fetchNotifications(token);
-      } else {
-        showNotification(data.message || 'Failed to send reply', 'error');
+      const recipientId = selectedMessage.fromUserId?._id || selectedMessage.fromUserId;
+      
+      if (token) {
+        const response = await fetch(`${getApiBaseUrl()}/messages/reply/${selectedMessage._id || selectedMessage.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ body: messageReply })
+        });
+        
+        if (response.ok) {
+          showNotification('Reply sent successfully', 'success');
+          setMessageReply('');
+          fetchMessages(token);
+        }
       }
-    } catch (e) {
-      console.error('Error sending reply:', e);
-      showNotification('Network error while sending reply', 'error');
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      showNotification('Failed to send reply', 'error');
     }
   };
 
-  // ✅ ENHANCED: Update profile function with backend integration
+  // Update profile function with backend integration
   const updateProfile = async (field, value) => {
+    if (!token) {
+      showNotification('Please log in to update profile', 'warning');
+      return;
+    }
+    
     try {
-      // FIXED: Handle nested fields properly
       let updateData = {};
       
       if (field.includes('.')) {
-        // Handle nested fields like "personalInfo.phone"
         const [parent, child] = field.split('.');
         updateData[parent] = { [child]: value };
       } else if (field === 'fullProfile') {
-        // Handle full profile update
         updateData = value;
       } else {
-        // Handle top-level fields
         updateData[field] = value;
       }
       
@@ -1691,7 +1663,6 @@ const App = () => {
       const data = await response.json();
       
       if (data.success) {
-        // Update local state
         if (field.includes('.')) {
           const [parent, child] = field.split('.');
           setUserProfile(prev => ({
@@ -1707,7 +1678,6 @@ const App = () => {
           setUserProfile(prev => ({ ...prev, [field]: value }));
         }
         
-        // Update user in storage
         const updatedUser = { ...user, ...data.user };
         setUser(updatedUser);
         
@@ -1715,11 +1685,6 @@ const App = () => {
           localStorage.setItem('user', JSON.stringify(updatedUser));
         } else {
           sessionStorage.setItem('user', JSON.stringify(updatedUser));
-        }
-        
-        // Trigger AI analysis when important profile fields change
-        if (['skills', 'experience', 'educationLevel', 'location'].includes(field)) {
-          setTimeout(() => analyzeProfileForImprovements(), 500);
         }
         
         showNotification('Profile updated successfully', 'success');
@@ -1732,7 +1697,7 @@ const App = () => {
     }
   };
 
-  // ✅ Update settings function
+  // Update settings function
   const updateSettings = (field, value) => {
     setUserSettings(prev => ({
       ...prev,
@@ -1747,7 +1712,7 @@ const App = () => {
     showNotification('Settings saved', 'success');
   };
 
-  // ✅ Scroll progress effect
+  // Scroll progress effect
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.pageYOffset;
@@ -1755,41 +1720,46 @@ const App = () => {
       const scrollPercent = docHeight > 0 ? scrollTop / docHeight : 0;
       setScrollProgress(scrollPercent);
     };
+    
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // ✅ Scroll to chat end effect
+  // Scroll to chat end effect
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, chatOpen]);
 
-  // ✅ Initial notifications effect
+  // Initial notifications effect
   useEffect(() => {
     setTimeout(() => {
       showNotification('Welcome to Mission Hub! Personalized job matches are ready.', 'success');
     }, 1000);
+    
     setTimeout(() => {
       setJobAlertBannerOpen(true);
       setTimeout(() => setJobAlertBannerOpen(false), 8000);
     }, 5000);
   }, []);
 
-  // ✅ Format timestamp function
+  // Format timestamp function
   const formatTimestamp = (date) => {
     const now = new Date();
     const messageDate = new Date(date);
     const diffMs = now - messageDate;
     const diffMins = Math.floor(diffMs / 60000);
+    
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} min ago`;
+    
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    
     const diffDays = Math.floor(diffHours / 24);
     return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
   };
 
-  // ✅ System Loader Component
+  // System Loader Component
   const SystemLoader = () => (
     <div className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
       <div className="text-center">
@@ -1810,7 +1780,7 @@ const App = () => {
     </div>
   );
 
-  // ✅ Loader Component for content loading
+  // Loader Component for content loading
   const Loader = () => (
     <div className="flex justify-center items-center py-12">
       <div className="flex flex-col items-center space-y-4">
@@ -1825,60 +1795,18 @@ const App = () => {
     </div>
   );
 
-  // ✅ Advertiser Notification Component
-  const AdvertiserNotification = ({ notification, onClose }) => {
-    if (!notification) return null;
-
-    const getNotificationStyles = () => {
-      switch (notification.type) {
-        case 'premium':
-          return 'bg-gray-900 text-white shadow-xl border border-gray-700';
-        case 'profile':
-          return 'bg-gray-800 text-white shadow-xl border border-gray-600';
-        case 'jobs':
-          return 'bg-gray-900 text-white shadow-xl border border-gray-700';
-        case 'tools':
-          return 'bg-gray-800 text-white shadow-xl border border-gray-600';
-        default:
-          return 'bg-gray-900 text-white shadow-xl border border-gray-700';
-      }
-    };
-
-    return (
-      <div className={`fixed top-24 right-6 p-4 rounded-lg z-40 max-w-sm animate-slideInRight ${getNotificationStyles()}`}>
-        <div className="flex items-start justify-between">
-          <div className="flex-1 mr-3">
-            <h3 className="font-semibold text-sm mb-1">{notification.title}</h3>
-            <p className="text-xs opacity-90 mb-2 leading-relaxed">{notification.message}</p>
-            <button 
-              onClick={() => {
-                showNotification(`Navigating to ${notification.action}...`, 'info');
-                onClose();
-              }}
-              className="px-3 py-1 bg-white bg-opacity-20 rounded-lg text-xs font-medium hover:bg-opacity-30 transition-all border border-white border-opacity-30 hover:scale-105 transform duration-200"
-            >
-              {notification.action}
-            </button>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-1 rounded-full hover:bg-white hover:bg-opacity-20 transition-colors flex-shrink-0 hover:scale-110 transform duration-200"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-        <div className="w-full bg-white bg-opacity-30 rounded-full h-1 mt-2">
-          <div 
-            className="h-1 bg-white rounded-full transition-all duration-100 ease-linear"
-            style={{ width: '100%' }}
-          />
-        </div>
-      </div>
-    );
-  };
-
-  // ✅ Page rendering function
+  // Page rendering function - Show dashboard for logged-in users or regular pages
   const renderPage = () => {
+    console.log('🔍 renderPage - user:', user?.name, '| userType:', user?.userType, '| token:', token ? 'present' : 'missing');
+    // Show company dashboard for company users only when we have both user and token
+    if (user?.userType === 'company' && token) {
+      console.log('✅ Rendering CompanyDashboard');
+      return (
+        <CompanyDashboard user={user} token={token} />
+      );
+    }
+
+    // For non-company users (job seekers or guests), show regular pages
     switch (currentPage) {
       case 'home':
         return (
@@ -1941,22 +1869,6 @@ const App = () => {
                     <Search className="w-5 h-5 inline mr-2" /> Search
                   </button>
                 </div>
-                {searchSuggestionsOpen && (
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 w-full md:w-3/4 max-w-4xl bg-white rounded-xl shadow-xl p-4 z-20">
-                    <p className="text-gray-500 text-sm font-medium mb-2">Popular Searches:</p>
-                    <div className="flex flex-wrap gap-3">
-                      {['React Developer', 'Data Scientist', 'Project Manager', 'Remote UX'].map(suggestion => (
-                        <button 
-                          key={suggestion}
-                          onClick={() => setSearchQuery(suggestion)}
-                          className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-gray-200 transition-colors"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1965,7 +1877,7 @@ const App = () => {
                 <div className="flex items-center space-x-3">
                   <Zap className="w-6 h-6" />
                   <span className="font-medium">Hot Alert!</span>
-                  <span>You have **{jobAlerts.filter(a => a.new).length}** new high-match mission opportunities waiting!</span>
+                  <span>You have new job opportunities waiting!</span>
                 </div>
                 <button 
                   onClick={() => setJobAlertBannerOpen(false)}
@@ -1977,72 +1889,53 @@ const App = () => {
             )}
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 bg-white">
-              <div className="mb-10 p-4 bg-gray-50 rounded-xl shadow-sm">
-                <h2 className="text-xl font-bold mb-4 text-gray-900">Browse by Category</h2>
+              <div className="mb-10 p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                <h2 className="text-xl font-bold mb-4 text-slate-900">Browse by Category</h2>
                 <div className="flex flex-wrap justify-center gap-4">
                   {categories.map(category => (
                     <button
                       key={category.id}
                       onClick={() => handleCategoryFilter(category.id)}
-                      className={`flex flex-col items-center p-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-md w-32 ${
+                      className={`flex flex-col items-center p-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-sm w-32 ${
                         activeCategory === category.id 
-                          ? 'bg-gray-900 text-white shadow-gray-300/50' 
-                          : 'bg-white text-gray-700 hover:bg-gray-100'
+                          ? 'bg-slate-900 text-white border border-slate-900' 
+                          : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-white'
                       }`}
                     >
-                      {React.cloneElement(category.icon, { className: `w-6 h-6 mb-2 ${activeCategory === category.id ? 'text-white' : 'text-gray-900'}` })}
+                      {React.cloneElement(category.icon, { className: `w-6 h-6 mb-2 ${activeCategory === category.id ? 'text-white' : 'text-slate-600'}` })}
                       <span className="font-medium text-sm">{category.name}</span>
-                      <span className="text-xs mt-1 opacity-75">{category.count} missions</span>
+                      <span className="text-xs mt-1 opacity-75">{category.count} jobs</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex flex-col md:flex-row justify-between items-center mb-8 p-4 bg-white rounded-xl shadow-sm border border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {isUserTyping ? 'Typing...' : isLoading ? 'Loading...' : `${displayedJobs.length} of ${filteredJobs.length} mission Found`}
-                </h2>
-                <div className="flex items-center space-x-4 mt-4 md:mt-0">
-                  <div className="relative">
-                    <button onClick={() => showNotification('Advanced filter modal opened', 'info')} className="flex items-center px-4 py-2 bg-gray-100 rounded-full text-gray-700 hover:bg-gray-200">
-                      <Filter className="w-5 h-5 mr-2" />
-                      Advanced Filters
-                      {activeFilters.type || activeFilters.experience || activeFilters.salary > 50000 || activeFilters.remote ? (
-                        <span className="ml-2 w-2 h-2 bg-gray-900 rounded-full"></span>
-                      ) : null}
-                    </button>
-                  </div>
-                  <button
-                    onClick={clearAllFilters}
-                    className="px-4 py-2 bg-gray-100 rounded-full text-gray-600 text-sm hover:bg-gray-200"
-                  >
-                    <Trash2 className="w-4 h-4 inline mr-1" /> Clear
-                  </button>
-                  <div className="flex space-x-2 p-1 bg-gray-100 rounded-full">
-                    <button
-                      onClick={() => setCurrentView('grid')}
-                      className={`p-2 rounded-full transition-colors ${currentView === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'}`}
-                    >
-                      <Grid className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => setCurrentView('list')}
-                      className={`p-2 rounded-full transition-colors ${currentView === 'list' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'}`}
-                    >
-                      <List className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <JobFilter
+                searchQuery={searchQuery}
+                onSearchChange={handleUserTyping}
+                locationQuery={locationQuery}
+                onLocationChange={handleUserTyping}
+                activeCategory={activeCategory}
+                onCategoryChange={handleCategoryFilter}
+                activeFilters={activeFilters}
+                onFilterChange={handleFilterChange}
+                onClearFilters={clearAllFilters}
+                currentView={currentView}
+                onViewChange={setCurrentView}
+                jobCount={filteredJobs.length}
+                isLoading={isLoading}
+                isTyping={isUserTyping}
+                categories={categories}
+              />
 
               {/* Jobs Grid with Loader */}
               {isLoading && !isUserTyping && displayedJobs.length === 0 ? (
                 <Loader />
               ) : (
                 <>
-                  <div className={`grid gap-8 ${currentView === 'grid' ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-1'}`}>
+                  <div className={`grid gap-2 ${currentView === 'grid' ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-1'}`}>
                     {displayedJobs.length > 0 ? (
-                      displayedJobs.map(job => (
+                      (showAllJobs ? displayedJobs : displayedJobs.slice(0, jobsPerPage)).map(job => (
                         <JobCard 
                           key={job.id} 
                           job={job} 
@@ -2055,6 +1948,7 @@ const App = () => {
                           toggleComparison={toggleComparison}
                           applyForJob={applyForJob}
                           toggleJobDetails={toggleJobDetails}
+                          contactCompany={contactCompany}
                           aiMatchScore={job.aiMatchScore}
                           isGoodMatch={job.isGoodMatch}
                           isExcellentMatch={job.isExcellentMatch}
@@ -2062,13 +1956,13 @@ const App = () => {
                       ))
                     ) : (
                       !isUserTyping && (
-                        <div className="col-span-full text-center p-12 bg-gray-50 rounded-xl shadow-sm">
-                          <EyeOffIcon className="w-10 h-10 text-gray-400 mx-auto mb-4" />
-                          <h3 className="text-xl font-semibold text-gray-900">No mission Match Your Filters</h3>
-                          <p className="text-gray-600">Try adjusting your search query, location, or clearing some filters.</p>
+                        <div className="col-span-full text-center p-12 bg-slate-50 rounded-xl border border-slate-200">
+                          <EyeOffIcon className="w-10 h-10 text-slate-400 mx-auto mb-4" />
+                          <h3 className="text-xl font-semibold text-slate-900">No Jobs Match Your Filters</h3>
+                          <p className="text-slate-600">Try adjusting your search query, location, or clearing some filters.</p>
                           <button 
                             onClick={clearAllFilters}
-                            className="mt-4 px-6 py-2 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors"
+                            className="mt-4 px-6 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors"
                           >
                             Clear Filters
                           </button>
@@ -2080,49 +1974,26 @@ const App = () => {
                   {/* Load More Section */}
                   {hasMoreJobs && !isUserTyping && (
                     <div className="mt-12 text-center">
-                      <div className="bg-gray-50 rounded-2xl p-8 border border-gray-200">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
-                          {displayedJobs.length} mission Loaded
-                        </h3>
-                        <p className="text-gray-600 mb-6">
-                          {filteredJobs.length - displayedJobs.length} more amazing opportunities waiting for you!
-                        </p>
+                      <div className="bg-white rounded-2xl p-8 border border-slate-200">
                         <button
                           onClick={loadMoreJobs}
-                          disabled={isLoading}
-                          className="px-8 py-4 bg-gray-900 text-white rounded-xl font-bold text-lg hover:bg-gray-800 transition-colors shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center mx-auto space-x-3"
+                          className="px-8 py-4 bg-slate-900 text-white rounded-xl font-bold text-lg hover:bg-slate-800 transition-all shadow-lg transform hover:scale-105 flex items-center mx-auto space-x-3"
                         >
-                          {isLoading ? (
-                            <>
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              <span>Loading More mission...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-5 h-5" />
-                              <span>Load More Jobs</span>
-                              <ChevronDown className="w-5 h-5" />
-                            </>
-                          )}
+                          <span>Load More ({filteredJobs.length - jobsPerPage} more)</span>
+                          <ChevronDown className="w-5 h-5" />
                         </button>
-                        <div className="mt-4 flex justify-center items-center space-x-4 text-sm text-gray-500">
-                          <span>Page {currentPageIndex} of {totalPages}</span>
-                          <span>•</span>
-                          <span>{jobsPerPage} jobs per load</span>
-                        </div>
                       </div>
                     </div>
                   )}
 
                   {/* All Jobs Loaded Message */}
-                  {!hasMoreJobs && displayedJobs.length > 0 && !isUserTyping && (
+                  {!hasMoreJobs && displayedJobs.length > 0 && !isUserTyping && showAllJobs && (
                     <div className="mt-12 text-center">
-                      <div className="bg-gray-50 rounded-2xl p-8 border border-gray-200">
-                        <CheckCircle className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">All mission Loaded!</h3>
-                        <p className="text-gray-600">
+                      <div className="bg-slate-50 rounded-2xl p-8 border border-slate-200">
+                        <CheckCircle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">All Jobs Loaded!</h3>
+                        <p className="text-slate-600">
                           You've seen all {displayedJobs.length} jobs matching your criteria. 
-                          {displayedJobs.length > 10 && " Try adjusting your filters to see more opportunities."}
                         </p>
                       </div>
                     </div>
@@ -2132,23 +2003,76 @@ const App = () => {
 
               <AboutSection 
                 aboutStats={aboutStats}
-                testimonials={testimonials}
-                StatCard={StatCard}
-                TestimonialCard={TestimonialCard}
               />
             </div>
           </>
         );
-      case 'company-dashboard':
+      case 'jobs':
         return (
-          <CompanyDashboard
-            user={user}
-            showNotification={showNotification}
-            jobs={backendJobs}
-            setJobs={setBackendJobs}
-            applications={companyApplications}
-            onSendMessage={sendMessageToUser}
-          />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white">
+            <div className="mb-8">
+              <h1 className="text-4xl font-bold text-slate-900 mb-2">All Jobs</h1>
+              <p className="text-lg text-slate-600">Browse all available job opportunities</p>
+            </div>
+            
+            <JobFilter
+              searchQuery={searchQuery}
+              onSearchChange={handleUserTyping}
+              locationQuery={locationQuery}
+              onLocationChange={handleUserTyping}
+              activeCategory={activeCategory}
+              onCategoryChange={handleCategoryFilter}
+              activeFilters={activeFilters}
+              onFilterChange={handleFilterChange}
+              onClearFilters={clearAllFilters}
+              currentView={currentView}
+              onViewChange={setCurrentView}
+              jobCount={filteredJobs.length}
+              isLoading={isLoading}
+              isTyping={isUserTyping}
+              categories={categories}
+            />
+
+            {/* Jobs Grid */}
+            {isLoading && filteredJobs.length === 0 ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="w-12 h-12 border-4 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
+              </div>
+            ) : filteredJobs.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                {filteredJobs.map(job => (
+                  <JobCard 
+                    key={job.id} 
+                    job={job} 
+                    bookmarkedJobs={bookmarkedJobs}
+                    appliedJobs={appliedJobs}
+                    comparisonJobs={comparisonJobs}
+                    expandedJobId={expandedJobId}
+                    toggleBookmark={toggleBookmark}
+                    toggleComparison={toggleComparison}
+                    applyForJob={applyForJob}
+                    toggleJobDetails={toggleJobDetails}
+                    contactCompany={contactCompany}
+                    aiMatchScore={job.aiMatchScore}
+                    isGoodMatch={job.isGoodMatch}
+                    isExcellentMatch={job.isExcellentMatch}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20">
+                <Briefcase className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-slate-900">No Jobs</h3>
+                <p className="text-slate-600">Try adjusting your search criteria</p>
+                <button 
+                  onClick={() => handleCategoryFilter('all')}
+                  className="mt-4 px-6 py-2 bg-slate-950 text-white rounded-lg hover:bg-slate-900"
+                >
+                  View All Jobs
+                </button>
+              </div>
+            )}
+          </div>
         );
       case 'bookmarks':
         const bookmarkedJobDetails = backendJobs.filter(job => bookmarkedJobs.has(job.id));
@@ -2170,9 +2094,9 @@ const App = () => {
                   onClick={() => handleNavigation('home')}
                   className="mt-6 px-6 py-3 bg-gray-900 text-white rounded-full font-medium hover:bg-gray-800 transition-colors"
                 >
-                  Start Browsing missions
+                  Start Browsing Jobs
                 </button>
-            </div>
+              </div>
             ) : (
               <div className="space-y-6">
                 {bookmarkedJobDetails.map(job => (
@@ -2188,6 +2112,7 @@ const App = () => {
                     toggleComparison={toggleComparison}
                     applyForJob={applyForJob}
                     toggleJobDetails={toggleJobDetails}
+                    contactCompany={contactCompany}
                     aiMatchScore={job.aiMatchScore}
                     isGoodMatch={job.isGoodMatch}
                     isExcellentMatch={job.isExcellentMatch}
@@ -2199,12 +2124,9 @@ const App = () => {
         );
       case 'about':
         return (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-gray-900">
             <AboutSection 
               aboutStats={aboutStats}
-              testimonials={testimonials}
-              StatCard={StatCard}
-              TestimonialCard={TestimonialCard}
             />
           </div>
         );
@@ -2226,41 +2148,46 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      {/* System Loader */}
-      {isLoading && <SystemLoader />}
-      
-      {/* Main App Content */}
-      {!isLoading && (
+    <ErrorBoundary>
+      <div className="min-h-screen bg-white text-gray-900">
+        {/* System Loader */}
+        {isLoading && <SystemLoader />}
+        
+        {/* Main App Content */}
+        {!isLoading && (
         <>
-          <Header 
-            currentPage={currentPage}
-            handleNavigation={handleNavigation}
-            user={user}
-            notifications={notifications}
-            messages={messages}
-            setLoginOpen={setLoginOpen}
-            setRegisterOpen={setRegisterOpen}
-            setPostJobOpen={setPostJobOpen}
-            showNotification={showNotification}
-            setNotificationPanelOpen={setNotificationPanelOpen}
-            setInboxPanelOpen={setInboxPanelOpen}
-            setProfileDropdownOpen={setProfileDropdownOpen}
-            profileDropdownOpen={profileDropdownOpen}
-            setProfilePanelOpen={setProfilePanelOpen}
-            setDocumentShareOpen={setDocumentShareOpen}
-            setSettingsPanelOpen={setSettingsPanelOpen}
-            handleLogout={handleLogout}
-            mobileMenuOpen={mobileMenuOpen}
-            setMobileMenuOpen={setMobileMenuOpen}
-            handlePostJobClick={handlePostJobClick}
-          />
+          {/* Conditionally render Header only for non-company users */}
+          {user?.userType !== 'company' && (
+            <Header 
+              currentPage={currentPage}
+              handleNavigation={handleNavigation}
+              user={user}
+              notifications={notifications}
+              messages={messages}
+              setLoginOpen={setLoginOpen}
+              setRegisterOpen={setRegisterOpen}
+              setPostJobOpen={setPostJobOpen}
+              showNotification={showNotification}
+              setNotificationPanelOpen={setNotificationPanelOpen}
+              setInboxPanelOpen={setInboxPanelOpen}
+              setProfileDropdownOpen={setProfileDropdownOpen}
+              profileDropdownOpen={profileDropdownOpen}
+              setProfilePanelOpen={setProfilePanelOpen}
+              setDocumentShareOpen={setDocumentShareOpen}
+              setSettingsPanelOpen={setSettingsPanelOpen}
+              handleLogout={handleLogout}
+              mobileMenuOpen={mobileMenuOpen}
+              setMobileMenuOpen={setMobileMenuOpen}
+              handlePostJobClick={handlePostJobClick}
+            />
+          )}
           
-          <main className="min-h-[70vh]">
+          <main className={user?.userType === 'company' ? "min-h-screen" : "min-h-[70vh]"}>
             {renderPage()}
           </main>
           
-          <Footer />
+          {/* Conditionally render Footer only for non-company users */}
+          {user?.userType !== 'company' && <Footer />}
 
           <Modals 
             loginOpen={loginOpen}
@@ -2276,7 +2203,7 @@ const App = () => {
             handleLogin={handleLogin}
             handleRegister={handleRegister}
             handlePostJob={handlePostJob}
-            handleFileUpload={handleFileUpload}
+            handleFileUpload={handleImageUpload}
             uploadedFile={uploadedFile}
             handleAddDocument={handleAddDocument}
             userDocuments={userDocuments}
@@ -2288,6 +2215,7 @@ const App = () => {
             newJob={newJob}
             handleNewJobChange={handleNewJobChange}
             user={user}
+            token={token}
           />
 
           <MobileMenu 
@@ -2322,6 +2250,7 @@ const App = () => {
             appliedJobs={appliedJobs}
             jobs={backendJobs}
             showNotification={showNotification}
+            token={token}
           />
 
           <NotificationInboxSettingsPanels 
@@ -2345,13 +2274,13 @@ const App = () => {
             messageReply={messageReply}
             setMessageReply={setMessageReply}
             sendMessageReply={sendMessageReply}
-            // Add these required props that were missing
+            fetchConversation={fetchConversation}
             userId={user?._id || user?.id}
             token={token}
             userType={user?.userType || 'jobSeeker'}
           />
 
-          {/* Company Applications Panel (simple inline list) */}
+          {/* Company Applications Panel - only show for company users and if there are applications */}
           {user?.userType === 'company' && companyApplications.length > 0 && (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
               <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -2364,19 +2293,7 @@ const App = () => {
                         <p className="text-sm text-gray-600">Applied for <span className="font-medium">{app.jobTitle}</span> at <span className="font-medium">{app.company}</span></p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${app.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : app.status === 'accepted' ? 'bg-green-100 text-green-800' : app.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>{app.status}</span>
-                        <button
-                          onClick={() => sendMessageToUser({
-                            toUserId: app.userId?._id || app.userId,
-                            jobId: app.jobId?._id || app.jobId,
-                            applicationId: app._id || app.id,
-                            subject: `Regarding your application for ${app.jobTitle}`,
-                            body: `Hello ${app.applicantName},\n\nThank you for applying for ${app.jobTitle}. We'd like to follow up regarding your application.`
-                          })}
-                          className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800"
-                        >
-                          Message Applicant
-                        </button>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${app.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : app.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{app.status}</span>
                       </div>
                     </div>
                   ))}
@@ -2385,46 +2302,14 @@ const App = () => {
             </div>
           )}
 
-          {/* Adverse Advertisement Component */}
-          <Adverse user={user} showNotification={showNotification} />
-
-          {/* Advertiser Notification */}
-          <AdvertiserNotification 
-            notification={advertiserNotification}
-            onClose={closeAdvertiserNotification}
-          />
-
           {/* AI Analysis Banner */}
-          {profileAnalysis && profileAnalysis.averageMatchScore < 70 && userSettings.aiMatching && (
-            <div className="fixed bottom-4 right-224 bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-lg z-40 max-w-sm">
-              <div className="flex items-start space-x-3">
-                <Brain className="w-6 h-6 text-gray-600 mt-1" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Profile Improvement Tips</h4>
-                  <p className="text-gray-600 text-sm mt-1">
-                    Your profile matches {profileAnalysis.averageMatchScore}% of jobs. 
-                    {profileAnalysis.improvementAreas.slice(0, 1).map(area => (
-                      <span key={area}> Consider: {area}</span>
-                    ))}
-                  </p>
-                  <button 
-                    onClick={() => setProfilePanelOpen(true)}
-                    className="text-gray-700 hover:text-gray-900 text-sm font-medium mt-2"
-                  >
-                    Improve Profile →
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {notification && (
             <div 
               key={notification.id}
               className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-xl z-50 text-white font-medium transition-all duration-500 ease-out animate-toastIn ${
-                notification.type === 'success' ? 'bg-gray-900' :
-                notification.type === 'info' ? 'bg-gray-800' :
-                notification.type === 'warning' ? 'bg-gray-700' : 'bg-gray-900'
+                notification.type === 'success' ? 'bg-green-600' :
+                notification.type === 'info' ? 'bg-blue-600' :
+                notification.type === 'warning' ? 'bg-yellow-600' : 'bg-red-600'
               }`}
             >
               {notification.message}
@@ -2432,7 +2317,8 @@ const App = () => {
           )}
         </>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };
 

@@ -4,26 +4,36 @@ import { PostJobModal, DocumentShareModal, DocumentPreviewModal } from './Upload
 
 export const Modals = ({
   // Auth Modal States
-  loginOpen, setLoginOpen,
-  registerOpen, setRegisterOpen,
+  loginOpen, 
+  setLoginOpen,
+  registerOpen, 
+  setRegisterOpen,
   
   // Upload Modal States
-  postJobOpen, setPostJobOpen,
-  documentShareOpen, setDocumentShareOpen,
-  documentPreview, setDocumentPreview,
+  postJobOpen, 
+  setPostJobOpen,
+  documentShareOpen, 
+  setDocumentShareOpen,
+  documentPreview, 
+  setDocumentPreview,
   
   // Handlers
-  handleLogin, handleRegister, handlePostJob,
-  handleAddDocument, handleToggleDocumentShare,
-  handleDeleteDocument, handlePreviewDocument,
+  handleLogin, 
+  handleRegister, 
+  handlePostJob,
+  handleAddDocument, 
+  handleToggleDocumentShare,
+  handleDeleteDocument, 
+  handlePreviewDocument,
   showNotification,
   
   // Props
-  newJob = {},
-  handleNewJobChange = () => {},
-  handleImageUpload = () => {},
+  newJob = {}, 
+  handleNewJobChange = () => {}, 
+  handleImageUpload = () => {}, 
   userDocuments = [],
-  user
+  user = null,
+  token = null 
 }) => {
   const switchToRegister = () => {
     setLoginOpen(false);
@@ -43,6 +53,7 @@ export const Modals = ({
         onClose={() => setLoginOpen(false)} 
         handleLogin={handleLogin}
         switchToRegister={switchToRegister}
+        showNotification={showNotification}
       />
       
       <RegisterModal 
@@ -50,6 +61,7 @@ export const Modals = ({
         onClose={() => setRegisterOpen(false)} 
         handleRegister={handleRegister}
         switchToLogin={switchToLogin}
+        showNotification={showNotification}
       />
 
       {/* Upload Modals */}
@@ -61,6 +73,7 @@ export const Modals = ({
         handlePostJob={handlePostJob}
         handleImageUpload={handleImageUpload}
         user={user}
+        token={token} 
       />
       
       <DocumentShareModal 
@@ -72,6 +85,7 @@ export const Modals = ({
         handleDeleteDocument={handleDeleteDocument}
         handlePreviewDocument={handlePreviewDocument}
         showNotification={showNotification}
+        token={token}
       />
       
       <DocumentPreviewModal 

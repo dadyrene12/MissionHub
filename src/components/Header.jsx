@@ -171,7 +171,7 @@ const Header = ({
   const getNavigationItems = () => {
     if (!user || !user.isVerified) {
       // Basic navigation for unverified or logged out users
-      return ['home', 'about'];
+      return ['home', 'jobs', 'about'];
     }
 
     if (isCompanyUser) {
@@ -179,7 +179,7 @@ const Header = ({
       return ['home'];
     } else {
       // Job seeker navigation
-      return ['home', 'bookmarks', 'comparison', 'about'];
+      return ['home', 'jobs', 'bookmarks', 'comparison', 'about'];
     }
   };
 
@@ -189,6 +189,7 @@ const Header = ({
   const getNavigationIcon = (page) => {
     const icons = {
       'home': <Home className="w-4 h-4 mr-1" />,
+      'jobs': <Briefcase className="w-4 h-4 mr-1" />,
       'bookmarks': <BookmarkCheck className="w-4 h-4 mr-1" />,
       'comparison': <BarChart3 className="w-4 h-4 mr-1" />,
       'about': <Users className="w-4 h-4 mr-1" />,
@@ -200,6 +201,7 @@ const Header = ({
   const getNavigationDisplayName = (page) => {
     const names = {
       'home': 'Home',
+      'jobs': 'Jobs',
       'bookmarks': 'Bookmarks',
       'comparison': 'Compare',
       'about': 'About',
