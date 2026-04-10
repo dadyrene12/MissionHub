@@ -56,7 +56,7 @@ const getApiBaseUrl = () => {
   if (import.meta.env.MODE === "development") {
     return "/api";
   }
-  return "https://your-production-url.com/api";
+  return "https://missionhubbackend.onrender.com/api";
 };
 
 // AI Profile-Job Matching Engine

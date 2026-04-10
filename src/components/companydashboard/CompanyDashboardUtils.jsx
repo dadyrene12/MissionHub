@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 // API Configuration
-const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://your-production-url.com/api';
+const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com/api';
 
 const getToken = () => localStorage.getItem('token') || sessionStorage.getItem('token');
 
@@ -184,7 +184,7 @@ export function ApplicantDetailModal({ isOpen, onClose, applicant, onAction }) {
   const handleViewCV = () => {
     if (resumeData?.url) {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const backendUrl = import.meta.env.MODE === "development" ? "http://localhost:5000" : 'https://your-production-url.com';
+      const backendUrl = import.meta.env.MODE === "development" ? "http://localhost:5000" : 'https://missionhubbackend.onrender.com';
       const fullUrl = `${backendUrl}${resumeData.url}${token ? `?token=${token}` : ''}`;
       window.open(fullUrl, '_blank');
     }
@@ -193,7 +193,7 @@ export function ApplicantDetailModal({ isOpen, onClose, applicant, onAction }) {
   const handleDownloadCV = () => {
     if (resumeData?.url) {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const backendUrl = import.meta.env.MODE === "development" ? "http://localhost:5000" : 'https://your-production-url.com';
+      const backendUrl = import.meta.env.MODE === "development" ? "http://localhost:5000" : 'https://missionhubbackend.onrender.com';
       const fullUrl = `${backendUrl}${resumeData.url}${token ? `?token=${token}` : ''}`;
       const link = document.createElement('a');
       link.href = fullUrl;

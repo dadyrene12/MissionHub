@@ -23,8 +23,8 @@ import {
 
 import { apiFetch, LoadingSpinner, Toast, Badge, PDFViewer, ApplicantDetailModal, MessageTemplatesModal, SendMessageModal, AIMatchingModal } from './companydashboard/CompanyDashboardUtils';
 
-const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://your-production-url.com/api';
-const BACKEND_URL = import.meta.env.MODE === "development" ? "http://localhost:5000" : 'https://your-production-url.com';
+const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com/api';
+const BACKEND_URL = import.meta.env.MODE === "development" ? "http://localhost:5000" : 'https://missionhubbackend.onrender.com';
 
 import DashboardPage from './companydashboard/DashboardPage';
 import { JobsPage } from './companydashboard/JobsPage';

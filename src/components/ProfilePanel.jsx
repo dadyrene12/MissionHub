@@ -4,7 +4,7 @@ import {
   Briefcase, Globe, Trash2, Save, Loader2, Award
 } from 'lucide-react';
 
-const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://your-production-url.com';
+const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com';
 
 const ProfilePanel = ({
   profilePanelOpen,
