@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Home, BookmarkCheck, Users, Menu, Bell, Inbox,
+  Home, BookmarkCheck, BarChart3, Users, Menu, Bell, Inbox,
   FilePlus, UserCircle, FileText, Settings, LogOut, X,
   ChevronDown, Building, Briefcase, Mail, MessageSquare,
 } from 'lucide-react';
@@ -66,6 +66,12 @@ const Header = ({
     if (user.name && typeof user.name === 'string') return user.name.charAt(0).toUpperCase();
     if (user.email && typeof user.email === 'string') return user.email.charAt(0).toUpperCase();
     return 'U';
+  };
+
+  // ✅ FIXED: Get user profile picture
+  const getUserProfilePicture = () => {
+    if (!user) return null;
+    return user.profilePhoto || user.profilePicture || user.avatar || null;
   };
 
   // ✅ FIXED: Get user display name with safe access
@@ -171,7 +177,7 @@ const Header = ({
   const getNavigationItems = () => {
     if (!user || !user.isVerified) {
       // Basic navigation for unverified or logged out users
-      return ['home', 'about'];
+      return ['home', 'jobs', 'about'];
     }
 
     if (isCompanyUser) {
@@ -179,7 +185,7 @@ const Header = ({
       return ['home', 'postJob'];
     } else {
       // Job seeker navigation
-      return ['home', 'bookmarks', 'about'];
+      return ['home', 'jobs', 'bookmarks', 'comparison', 'about'];
     }
   };
 
@@ -189,7 +195,9 @@ const Header = ({
   const getNavigationIcon = (page) => {
     const icons = {
       'home': <Home className="w-4 h-4 mr-1" />,
+      'jobs': <Briefcase className="w-4 h-4 mr-1" />,
       'bookmarks': <BookmarkCheck className="w-4 h-4 mr-1" />,
+      'comparison': <BarChart3 className="w-4 h-4 mr-1" />,
       'postJob': <FilePlus className="w-4 h-4 mr-1" />,
       'about': <Users className="w-4 h-4 mr-1" />,
     };
@@ -200,7 +208,9 @@ const Header = ({
   const getNavigationDisplayName = (page) => {
     const names = {
       'home': 'Home',
+      'jobs': 'Jobs',
       'bookmarks': 'Bookmarks',
+      'comparison': 'Compare',
       'postJob': 'Post Job',
       'about': 'About',
     };
@@ -362,16 +372,24 @@ const Header = ({
                   aria-expanded={profileDropdownOpen}
                   disabled={!user.isVerified}
                 >
-                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm shadow-sm ${
-                    user.isVerified 
-                      ? 'bg-gray-900 text-white' 
-                      : 'bg-gray-400 text-white'
-                  }`}>
-                    {getUserInitial()}
-                    {!user.isVerified && (
-                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></span>
-                    )}
-                  </div>
+                  {getUserProfilePicture() ? (
+                    <img 
+                      src={getUserProfilePicture()} 
+                      alt="Profile" 
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-gray-200"
+                    />
+                  ) : (
+                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm shadow-sm ${
+                      user.isVerified 
+                        ? 'bg-gray-900 text-white' 
+                        : 'bg-gray-400 text-white'
+                    }`}>
+                      {getUserInitial()}
+                    </div>
+                  )}
+                  {!user.isVerified && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></span>
+                  )}
                   <div className="hidden lg:flex flex-col items-start">
                     <span className={`text-sm font-medium group-hover:text-gray-900 ${
                       user.isVerified ? 'text-gray-700' : 'text-gray-500'

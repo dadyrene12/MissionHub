@@ -1,6 +1,6 @@
 // src/components/MobileMenu.jsx
 import React from 'react';
-import { Home, BookmarkCheck, Users, FilePlus, LogOut, X } from 'lucide-react';
+import { Home, BookmarkCheck, BarChart3, Users, FilePlus, LogOut, X, Briefcase } from 'lucide-react';
 
 const MobileMenu = ({
   mobileMenuOpen,
@@ -23,7 +23,7 @@ const MobileMenu = ({
         </button>
       </div>
       <nav className="flex flex-col space-y-4 text-xl flex-1">
-        {['home', 'bookmarks', 'about'].map(page => (
+        {['home', 'jobs', 'bookmarks', 'comparison', 'about'].map(page => (
           <button
             key={page}
             onClick={() => handleNavigation(page)}
@@ -34,7 +34,9 @@ const MobileMenu = ({
             }`}
           >
             {page === 'home' && <Home className="w-6 h-6 mr-3" />}
+            {page === 'jobs' && <Briefcase className="w-6 h-6 mr-3" />}
             {page === 'bookmarks' && <BookmarkCheck className="w-6 h-6 mr-3" />}
+            {page === 'comparison' && <BarChart3 className="w-6 h-6 mr-3" />}
             {page === 'about' && <Users className="w-6 h-6 mr-3" />}
             {page.charAt(0).toUpperCase() + page.slice(1)}
           </button>

@@ -760,11 +760,16 @@ const App = () => {
         .then(res => res.json())
         .then(profileData => {
           if (profileData.success && profileData.data) {
+            const userData = profileData.data.user || profileData.data;
             setUserProfile(prev => ({
               ...prev,
-              ...profileData.data,
-              profile: profileData.data.profile || {}
+              ...userData,
+              profile: userData.profile || profileData.data.profile || {}
             }));
+            // Also update user state with profile photo
+            if (userData.profile?.profilePhoto) {
+              setUser(prev => prev ? { ...prev, profilePhoto: userData.profile.profilePhoto } : prev);
+            }
           }
         })
         .catch(console.error);
@@ -2039,7 +2044,7 @@ const App = () => {
                 <div className="w-12 h-12 border-4 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
               </div>
             ) : filteredJobs.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {filteredJobs.map(job => (
                   <JobCard 
                     key={job.id} 
@@ -2124,7 +2129,11 @@ const App = () => {
         );
       case 'about':
         return (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-gray-900">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 bg-gray-900">
+            <div className="mb-12">
+              <h2 className="text-4xl md:text-5xl font-bold text-white text-center mb-4">About MissionHub</h2>
+              <p className="text-white/70 text-center text-lg max-w-3xl mx-auto">Connecting talented job seekers with their dream careers and helping companies build their perfect teams.</p>
+            </div>
             <AboutSection 
               aboutStats={aboutStats}
             />
@@ -2246,6 +2255,7 @@ const App = () => {
             profilePanelOpen={profilePanelOpen}
             setProfilePanelOpen={setProfilePanelOpen}
             userProfile={userProfile}
+            user={user}
             updateProfile={updateProfile}
             appliedJobs={appliedJobs}
             jobs={backendJobs}

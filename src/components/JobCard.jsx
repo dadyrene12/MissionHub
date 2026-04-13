@@ -216,24 +216,24 @@ const JobCard = ({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden transition-all duration-300 hover:shadow-xl hover:border-slate-300 group h-full flex flex-col">
+    <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-2xl hover:border-indigo-200 hover:-translate-y-1 group h-full flex flex-col">
       {/* Header */}
-      <div className="relative p-5 bg-white">
+      <div className="relative p-6 bg-gradient-to-br from-slate-50 to-white">
         {/* Top Row */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex flex-wrap gap-2">
             {job.remote && (
-              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full flex items-center gap-1 border border-emerald-200">
+              <span className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-semibold rounded-full flex items-center gap-1.5 shadow-sm">
                 <Wifi className="w-3 h-3" /> Remote
               </span>
             )}
             {job.urgent && (
-              <span className="px-2.5 py-1 bg-rose-50 text-rose-700 text-xs font-semibold rounded-full flex items-center gap-1 border border-rose-200">
+              <span className="px-3 py-1.5 bg-gradient-to-r from-rose-500 to-rose-600 text-white text-xs font-semibold rounded-full flex items-center gap-1.5 shadow-sm">
                 <AlertCircle className="w-3 h-3" /> Urgent
               </span>
             )}
             {job.featured && (
-              <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full flex items-center gap-1 border border-amber-200">
+              <span className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-semibold rounded-full flex items-center gap-1.5 shadow-sm">
                 <Star className="w-3 h-3" /> Featured
               </span>
             )}
@@ -241,21 +241,21 @@ const JobCard = ({
 
           <button
             onClick={(e) => { e.stopPropagation(); toggleBookmark(job.id); }}
-            className="w-8 h-8 bg-slate-50 hover:bg-slate-100 rounded-lg flex items-center justify-center border border-slate-200 transition-all duration-200"
+            className="w-9 h-9 bg-white hover:bg-indigo-50 rounded-xl flex items-center justify-center border-2 border-slate-100 hover:border-indigo-200 transition-all duration-200 shadow-sm"
           >
             {isBookmarked ? (
-              <BookmarkCheck className="w-4 h-4 text-amber-500 fill-current" />
+              <BookmarkCheck className="w-5 h-5 text-amber-500 fill-current" />
             ) : (
-              <Bookmark className="w-4 h-4 text-slate-400" />
+              <Bookmark className="w-5 h-5 text-slate-400 hover:text-indigo-500" />
             )}
           </button>
         </div>
 
         {/* Company Info */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center border-2 border-slate-200 shadow-sm">
             {job.logo ? (
-              <img src={job.logo} alt={job.company} className="w-10 h-10 rounded-lg object-cover" />
+              <img src={job.logo} alt={job.company} className="w-12 h-12 rounded-xl object-cover" />
             ) : (
               <span className="text-slate-950 font-bold text-lg">{job.company?.substring(0, 2).toUpperCase() || 'CO'}</span>
             )}

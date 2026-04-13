@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   X, Upload, FileText, Eye, Edit, User, MapPin, 
-  Briefcase, Globe, Trash2, Save, Loader2, Award
+  Briefcase, Globe, Trash2, Save, Loader2, Award, Camera
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com';
@@ -12,12 +12,15 @@ const ProfilePanel = ({
   userProfile,
   updateProfile,
   showNotification,
-  token
+  token,
+  user
 }) => {
   const [activeTab, setActiveTab] = useState('personal');
   const [fileUploading, setFileUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [profilePicture, setProfilePicture] = useState(null);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -39,6 +42,7 @@ const ProfilePanel = ({
   
   const resumeInputRef = useRef(null);
   const cvInputRef = useRef(null);
+  const profilePictureInputRef = useRef(null);
   const abortControllerRef = useRef(null);
 
   const getToken = () => token || localStorage.getItem('token') || '';
@@ -61,44 +65,37 @@ const ProfilePanel = ({
         signal: abortControllerRef.current.signal
       });
       
-      console.log('Profile API status:', res.status);
-      
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Profile API error:', res.status, errorText);
         throw new Error(`Server error: ${res.status}`);
       }
       
-      const text = await res.text();
-      console.log('Profile API response text:', text.substring(0, 200));
-      
-      if (!text.trim()) {
-        throw new Error('Empty response');
-      }
-      
-      const data = JSON.parse(text);
-      console.log('Profile API response:', data);
+      const data = await res.json();
       
       if (data.success && data.data) {
         const profile = data.data.profile || {};
+        const user = data.data.user || {};
         
-        setFormData({
-          name: profile.name || '',
-          email: profile.email || '',
-          phone: profile.phone || '',
-          location: profile.location || '',
-          title: profile.title || '',
-          bio: profile.bio || '',
-          experience: profile.experience || '',
-          education: profile.education || '',
-          skills: Array.isArray(profile.skills) ? profile.skills.join(', ') : (profile.skills || ''),
-          linkedin: profile.linkedin || '',
-          github: profile.github || '',
-          portfolio: profile.portfolio || '',
+        setFormData(prev => ({
+          name: prev.name || profile.name || user.name || '',
+          email: prev.email || user.email || profile.email || '',
+          phone: prev.phone || profile.phone || '',
+          location: prev.location || profile.location || '',
+          title: prev.title || profile.title || '',
+          bio: prev.bio || profile.bio || '',
+          experience: prev.experience || profile.experience || '',
+          education: prev.education || profile.education || '',
+          skills: prev.skills || (Array.isArray(profile.skills) ? profile.skills.join(', ') : (profile.skills || '')),
+          linkedin: prev.linkedin || profile.linkedin || '',
+          github: prev.github || profile.github || '',
+          portfolio: prev.portfolio || profile.portfolio || '',
           resume: profile.resume || null,
           cv: profile.cv || null,
           documents: profile.documents || []
-        });
+        }));
+        
+        if (!profilePicture && (profile.profilePhoto || profile.profilePicture || user.profilePhoto || user.profilePicture)) {
+          setProfilePicture(profile.profilePhoto || profile.profilePicture || user.profilePhoto || user.profilePicture);
+        }
       }
     } catch (error) {
       if (error.name !== 'AbortError') {
@@ -109,12 +106,42 @@ const ProfilePanel = ({
     }
   }, []);
 
-  // Load profile when panel opens
+  // Initialize form data from userProfile prop when panel first opens
   useEffect(() => {
     if (profilePanelOpen) {
+      // First priority: userProfile prop from App
+      if (userProfile) {
+        setFormData(prev => ({
+          name: prev.name || userProfile.name || user?.name || '',
+          email: prev.email || userProfile.email || user?.email || '',
+          phone: prev.phone || userProfile.phone || userProfile.profile?.phone || '',
+          location: prev.location || userProfile.location || userProfile.profile?.location || '',
+          title: prev.title || userProfile.title || userProfile.profile?.title || '',
+          bio: prev.bio || userProfile.bio || userProfile.profile?.bio || '',
+          experience: prev.experience || userProfile.experience || userProfile.profile?.experience || '',
+          education: prev.education || userProfile.education || userProfile.profile?.education || '',
+          skills: prev.skills || (Array.isArray(userProfile.skills) ? userProfile.skills.join(', ') : (userProfile.skills || userProfile.profile?.skills || '')),
+          linkedin: prev.linkedin || userProfile.linkedin || userProfile.profile?.linkedin || '',
+          github: prev.github || userProfile.github || userProfile.profile?.github || '',
+          portfolio: prev.portfolio || userProfile.portfolio || userProfile.profile?.portfolio || ''
+        }));
+      }
+      
+      // Also check user prop for profile photo
+      if (user?.profilePhoto && !profilePicture) {
+        setProfilePicture(user.profilePhoto);
+      }
+      if (userProfile?.profilePhoto && !profilePicture) {
+        setProfilePicture(userProfile.profilePhoto);
+      }
+      if (userProfile?.profile?.profilePhoto && !profilePicture) {
+        setProfilePicture(userProfile.profile.profilePhoto);
+      }
+      
+      // Then fetch from API to get latest data
       fetchProfile();
     }
-  }, [profilePanelOpen, fetchProfile]);
+  }, [profilePanelOpen, fetchProfile, userProfile, profilePicture, user]);
 
   // Handle input changes
   const handleChange = (e) => {
@@ -122,56 +149,89 @@ const ProfilePanel = ({
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Profile picture upload handler
+  const handleProfilePictureUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification('File size must be less than 5MB', 'error');
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      showNotification('Please upload a valid image file (JPEG, PNG, GIF, or WebP)', 'error');
+      return;
+    }
+
+    setIsUploadingPicture(true);
+    const formDataUpload = new FormData();
+    formDataUpload.append('photo', file);
+
+    try {
+      const currentToken = getToken();
+      const res = await fetch(`${API_BASE}/upload/profile-photo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${currentToken}` },
+        body: formDataUpload
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        let url = data.photoUrl || data.data?.photoUrl || data.data?.url || data.url;
+        if (url && !url.startsWith('http')) {
+          url = API_BASE + url;
+        }
+        setProfilePicture(url);
+        showNotification('Profile picture updated successfully!', 'success');
+      } else {
+        showNotification(data.message || 'Failed to upload profile picture', 'error');
+      }
+    } catch (error) {
+      console.error('Error uploading profile picture:', error);
+      showNotification('Failed to upload profile picture. Please try again.', 'error');
+    } finally {
+      setIsUploadingPicture(false);
+    }
+  };
+
   // Save profile to database
-  // Save profile to database - step by step
-  const handleSaveProfile = async (step = null) => {
+  const handleSaveProfile = async () => {
     const currentToken = getToken();
-    if (!currentToken) return;
+    if (!currentToken) {
+      showNotification('Please log in to save your profile', 'error');
+      return;
+    }
 
     setIsSaving(true);
     try {
+      // Process skills - convert comma-separated string to array
+      let skillsArray = [];
+      if (formData.skills) {
+        if (Array.isArray(formData.skills)) {
+          skillsArray = formData.skills;
+        } else if (typeof formData.skills === 'string') {
+          skillsArray = formData.skills.split(',').map(s => s.trim()).filter(Boolean);
+        }
+      }
+
       const requestBody = {
-        step: step
+        name: formData.name || '',
+        phone: formData.phone || '',
+        location: formData.location || '',
+        title: formData.title || '',
+        bio: formData.bio || '',
+        experience: formData.experience || '',
+        education: formData.education || '',
+        skills: skillsArray,
+        linkedin: formData.linkedin || '',
+        github: formData.github || '',
+        portfolio: formData.portfolio || '',
+        profilePhoto: profilePicture || ''
       };
       
-      // Add fields based on step
-      if (step === 'personal' || step === null) {
-        requestBody.name = formData.name || '';
-        requestBody.email = formData.email || '';
-      }
-      
-      if (step === 'contact' || step === null) {
-        requestBody.profile = {
-          phone: formData.phone || '',
-          location: formData.location || ''
-        };
-      }
-      
-      if (step === 'professional' || step === null) {
-        if (!requestBody.profile) requestBody.profile = {};
-        requestBody.profile.title = formData.title || '';
-        requestBody.profile.bio = formData.bio || '';
-        requestBody.profile.experience = formData.experience || '';
-        requestBody.profile.education = formData.education || '';
-        requestBody.profile.skills = formData.skills || '';
-      }
-      
-      if (step === 'links' || step === null) {
-        if (!requestBody.profile) requestBody.profile = {};
-        requestBody.profile.linkedin = formData.linkedin || '';
-        requestBody.profile.github = formData.github || '';
-        requestBody.profile.portfolio = formData.portfolio || '';
-      }
-      
-      if (step === 'documents' || step === null) {
-        if (!requestBody.profile) requestBody.profile = {};
-        requestBody.profile.resume = formData.resume;
-        requestBody.profile.cv = formData.cv;
-        requestBody.profile.documents = formData.documents;
-      }
-      
-      console.log('Saving step:', step || 'all');
-      console.log('Request body:', JSON.stringify(requestBody));
+      console.log('Saving profile:', JSON.stringify(requestBody, null, 2));
       
       const res = await fetch(`${API_BASE}/users/me`, {
         method: 'PUT',
@@ -184,21 +244,44 @@ const ProfilePanel = ({
       
       console.log('Save response status:', res.status);
       
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Save error:', res.status, errorText);
+        throw new Error(`Server error: ${res.status}`);
+      }
+      
       const data = await res.json();
       console.log('Save response:', data);
       
       if (data.success) {
-        if (step) {
-          showNotification(`${step.charAt(0).toUpperCase() + step.slice(1)} saved successfully`, 'success');
-        } else {
-          showNotification('Profile saved successfully', 'success');
+        showNotification('Profile saved successfully!', 'success');
+        // Update local state with saved data
+        if (data.data && data.data.user) {
+          const user = data.data.user;
+          setFormData(prev => ({
+            ...prev,
+            name: user.name || prev.name,
+            phone: user.profile?.phone || prev.phone,
+            location: user.profile?.location || prev.location,
+            title: user.profile?.title || prev.title,
+            bio: user.profile?.bio || prev.bio,
+            experience: user.profile?.experience || prev.experience,
+            education: user.profile?.education || prev.education,
+            skills: Array.isArray(user.profile?.skills) ? user.profile.skills.join(', ') : (user.profile?.skills || prev.skills),
+            linkedin: user.profile?.linkedin || prev.linkedin,
+            github: user.profile?.github || prev.github,
+            portfolio: user.profile?.portfolio || prev.portfolio
+          }));
+          if (user.profile?.profilePhoto) {
+            setProfilePicture(user.profile.profilePhoto);
+          }
         }
       } else {
         showNotification(data.message || 'Failed to save profile', 'error');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      showNotification('Failed to save profile', 'error');
+      showNotification('Failed to save profile. Please try again.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -363,7 +446,7 @@ const ProfilePanel = ({
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setProfilePanelOpen(false)} />
-      <div className="fixed right-0 top-0 h-full w-full sm:w-[600px] bg-white shadow-2xl z-50 overflow-y-auto">
+      <div className="fixed right-0 top-0 h-full w-full sm:w-[90vw] md:w-[900px] lg:w-[1000px] bg-white shadow-2xl z-50 overflow-y-auto max-w-[1200px]">
         <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between z-10">
           <h2 className="text-xl font-bold text-slate-950">Profile Settings</h2>
           <button onClick={() => setProfilePanelOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -398,6 +481,49 @@ const ProfilePanel = ({
               {/* Personal Tab */}
               {activeTab === 'personal' && (
                 <div className="space-y-6">
+                  {/* Profile Picture Section */}
+                  <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-2xl p-6 border border-slate-200">
+                    <h3 className="text-lg font-bold text-slate-950 mb-4 flex items-center">
+                      <div className="w-8 h-8 bg-slate-950 rounded-lg flex items-center justify-center mr-3">
+                        <User className="w-4 h-4 text-white" />
+                      </div>
+                      Profile Photo
+                    </h3>
+                    <div className="flex items-center space-x-6">
+                      <div className="relative">
+                        <div className="w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+                          {profilePicture ? (
+                            <img src={profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="w-12 h-12 text-slate-400" />
+                          )}
+                        </div>
+                        <button
+                          onClick={() => profilePictureInputRef.current?.click()}
+                          disabled={isUploadingPicture}
+                          className="absolute bottom-0 right-0 w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-white hover:bg-slate-800 transition-colors shadow-lg"
+                        >
+                          {isUploadingPicture ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Camera className="w-4 h-4" />
+                          )}
+                        </button>
+                        <input
+                          type="file"
+                          ref={profilePictureInputRef}
+                          onChange={handleProfilePictureUpload}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-950">Profile Picture</p>
+                        <p className="text-sm text-slate-500">Click the camera icon to upload</p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-2xl p-6 border border-slate-200">
                     <h3 className="text-lg font-bold text-slate-950 mb-4 flex items-center">
                       <div className="w-8 h-8 bg-slate-950 rounded-lg flex items-center justify-center mr-3">
@@ -414,7 +540,7 @@ const ProfilePanel = ({
                           value={formData.name}
                           onChange={handleChange}
                           className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-                          placeholder="John Doe"
+                          placeholder="Enter your full name"
                         />
                       </div>
                       <div>
@@ -424,8 +550,9 @@ const ProfilePanel = ({
                           name="email"
                           value={formData.email}
                           onChange={handleChange}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-                          placeholder="john@example.com"
+                          readOnly
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-gray-50 cursor-not-allowed text-gray-500"
+                          placeholder="your.email@example.com"
                         />
                       </div>
                     </div>
@@ -494,9 +621,9 @@ const ProfilePanel = ({
                           name="experience"
                           value={formData.experience}
                           onChange={handleChange}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-                          rows={3}
-                          placeholder="Describe your work experience..."
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white text-slate-900"
+                          rows={5}
+                          placeholder="Describe your work experience, roles, responsibilities and achievements..."
                         />
                       </div>
                       <div>
@@ -505,9 +632,9 @@ const ProfilePanel = ({
                           name="education"
                           value={formData.education}
                           onChange={handleChange}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-                          rows={3}
-                          placeholder="Your education background..."
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white text-slate-900"
+                          rows={5}
+                          placeholder="Your education background, degrees, certifications..."
                         />
                       </div>
                       <div>

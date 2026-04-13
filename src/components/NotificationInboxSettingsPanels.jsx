@@ -156,22 +156,22 @@ const NotificationPanel = ({
   };
 
   return (
-    <div className={`fixed right-0 top-0 h-screen w-full md:w-[420px] bg-slate-50 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${notificationPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-      {/* Header with bg-slate-950 only */}
-      <div className="sticky top-0 bg-slate-950 p-5 z-10">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-slate-900 rounded-xl flex items-center justify-center border border-white/10">
-              <Bell className="w-5 h-5 text-white" />
+    <div className={`fixed right-0 top-0 h-screen w-full md:w-[450px] lg:w-[500px] bg-gradient-to-b from-slate-50 to-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${notificationPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      {/* Header with modern gradient */}
+      <div className="sticky top-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 z-10">
+        <div className="flex justify-between items-center mb-5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Bell className="w-6 h-6 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Notifications</h2>
-              <p className="text-white/60 text-xs">Stay updated on your activities</p>
+              <p className="text-white/50 text-xs">Stay updated on your activities</p>
             </div>
           </div>
           <button 
             onClick={() => setNotificationPanelOpen(false)}
-            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 transition-colors border border-white/10"
+            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 backdrop-blur-sm"
           >
             <X className="w-5 h-5 text-white" />
           </button>
@@ -186,31 +186,31 @@ const NotificationPanel = ({
               placeholder="Search notifications..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/20"
+              className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-white/20 backdrop-blur-sm"
             />
           </div>
           
-          <div className="flex space-x-1 bg-slate-900 rounded-xl p-1">
+          <div className="flex space-x-1.5 bg-white/10 rounded-xl p-1.5 backdrop-blur-sm">
             {[
               { id: 'all', label: 'All', count: notifications.length },
               { id: 'unread', label: 'Unread', count: unreadCount },
-              { id: 'message', label: 'Msgs', count: notifications.filter(n => n.type === 'message').length },
-              { id: 'application', label: 'Apps', count: notifications.filter(n => n.type === 'application').length },
+              { id: 'message', label: 'Messages', count: notifications.filter(n => n.type === 'message').length },
+              { id: 'application', label: 'Applications', count: notifications.filter(n => n.type === 'application').length },
               { id: 'announcement', label: 'News', count: notifications.filter(n => n.type === 'announcement').length }
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setFilter(tab.id)}
-                className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
                   filter === tab.id
-                    ? 'bg-white text-slate-900'
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                     : 'text-white/60 hover:text-white hover:bg-white/10'
                 }`}
               >
                 {tab.label}
                 {tab.count > 0 && (
-                  <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
-                    filter === tab.id ? 'bg-slate-900/20 text-slate-900' : 'bg-white/10 text-white/60'
+                  <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
+                    filter === tab.id ? 'bg-white/20 text-white' : 'bg-white/10 text-white/60'
                   }`}>
                     {tab.count}
                   </span>
@@ -221,33 +221,43 @@ const NotificationPanel = ({
         </div>
       </div>
 
-      <div className="p-4">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center">
-              {filteredNotifications.filter(n => !n.read).length} Unread
-            </h3>
+      <div className="p-5">
+        <div className="flex justify-between items-center mb-5">
+          <div className="flex items-center gap-3">
+            <div className="px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full">
+              <h3 className="text-sm font-bold text-white flex items-center">
+                {filteredNotifications.filter(n => !n.read).length} Unread
+              </h3>
+            </div>
             <p className="text-xs text-slate-500">Updates & alerts</p>
           </div>
           {notifications.length > 0 && (
             <button 
               onClick={markAllNotificationsAsRead}
-              className="px-3 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all text-xs font-medium flex items-center border border-white/10"
+              className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all text-xs font-medium flex items-center shadow-lg hover:shadow-xl"
             >
-              <CheckSquare className="w-3 h-3 mr-1.5" />
+              <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
               Mark all read
             </button>
           )}
         </div>
 
         <div className="space-y-3">
-          {filteredNotifications.map(notification => (
+          {filteredNotifications.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Bell className="w-8 h-8 text-slate-400" />
+              </div>
+              <h3 className="text-slate-900 font-semibold mb-1">No notifications</h3>
+              <p className="text-slate-500 text-sm">You're all caught up!</p>
+            </div>
+          ) : filteredNotifications.map(notification => (
             <div 
               key={notification.id || notification._id} 
-              className={`p-4 rounded-2xl border transition-all duration-300 hover:shadow-lg cursor-pointer ${
+              className={`p-4 rounded-2xl border-2 transition-all duration-300 hover:shadow-xl cursor-pointer group ${
                 notification.read 
-                  ? 'bg-white border-slate-200' 
-                  : 'bg-white border-l-4 border-l-slate-900 border-slate-200'
+                  ? 'bg-white border-slate-100 hover:border-slate-200' 
+                  : 'bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-l-indigo-500 border-slate-200'
               } ${
                 notification.priority === 'high' ? 'border-l-4 border-l-red-500 bg-red-50' : ''
               }`}
@@ -263,20 +273,23 @@ const NotificationPanel = ({
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center flex-1">
-                  <div className={`p-2.5 rounded-xl mr-3 ${getNotificationColor(notification.type)}`}>
+                  <div className={`p-3 rounded-2xl mr-3 ${getNotificationColor(notification.type)} shadow-lg`}>
                     {getNotificationIcon(notification.type)}
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-semibold text-slate-900 text-sm leading-tight">
+                    <h4 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-indigo-600 transition-colors">
                       {notification.title}
                     </h4>
-                    <p className="text-xs text-slate-500 mt-1 flex items-center">
+                    <p className="text-xs text-slate-500 mt-1.5 flex items-center">
                       <Clock className="w-3 h-3 mr-1" />
                       {formatDate(notification.date || notification.createdAt)}
                     </p>
                   </div>
                 </div>
-                <div className="flex space-x-1 ml-2">
+                <div className="flex space-x-1.5 ml-2">
+                  {!notification.read && (
+                    <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-pulse"></span>
+                  )}
                   {!notification.read && (
                     <button 
                       onClick={(e) => {
@@ -286,7 +299,7 @@ const NotificationPanel = ({
                       className="p-1.5 rounded-full hover:bg-slate-100 transition-colors"
                       title="Mark as read"
                     >
-                      <EyeOff className="w-4 h-4 text-slate-500" />
+                      <EyeOff className="w-4 h-4 text-slate-400" />
                     </button>
                   )}
                   <button 
@@ -770,22 +783,22 @@ const InboxPanel = ({
   };
 
   return (
-    <div className={`fixed right-0 top-0 h-screen w-full md:w-[420px] bg-slate-50 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${inboxPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-      {/* Header with bg-slate-950 only */}
-      <div className="sticky top-0 bg-slate-950 p-5 z-10">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-slate-900 rounded-xl flex items-center justify-center border border-white/10">
-              <MessageSquare className="w-5 h-5 text-white" />
+    <div className={`fixed right-0 top-0 h-screen w-full md:w-[450px] lg:w-[500px] bg-gradient-to-b from-slate-50 to-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${inboxPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      {/* Header with modern gradient */}
+      <div className="sticky top-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 z-10">
+        <div className="flex justify-between items-center mb-5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+              <MessageSquare className="w-6 h-6 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Messages</h2>
-              <p className="text-white/60 text-xs">Communicate with others</p>
+              <p className="text-white/50 text-xs">Communicate with others</p>
             </div>
           </div>
           <button 
             onClick={() => setInboxPanelOpen(false)}
-            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 transition-colors border border-white/10"
+            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 backdrop-blur-sm"
           >
             <X className="w-5 h-5 text-white" />
           </button>
@@ -799,27 +812,27 @@ const InboxPanel = ({
             placeholder="Search conversations..."
             value={messageSearch}
             onChange={(e) => setMessageSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/20"
+            className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-white/20 backdrop-blur-sm"
           />
         </div>
       </div>
 
-      {/* Message Tabs - Dark design */}
-      <div className="px-4 py-3 bg-slate-950 border-b border-white/10">
-        <div className="flex space-x-1 bg-slate-900 rounded-xl p-1">
+      {/* Message Tabs - Modern design */}
+      <div className="px-5 py-4 bg-white border-b border-slate-100">
+        <div className="flex space-x-1.5 bg-slate-100 rounded-xl p-1.5">
           {[
             { id: 'all', label: 'All', count: userMessages.length },
             { id: 'unread', label: 'Unread', count: userMessages.filter(m => !m.read).length },
             { id: 'jobs', label: 'Jobs', count: userMessages.filter(m => m.type === 'job_related').length },
-            { id: 'applications', label: 'Apps', count: userMessages.filter(m => m.type === 'application_related').length }
+            { id: 'applications', label: 'Applications', count: userMessages.filter(m => m.type === 'application_related').length }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+              className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'bg-white text-slate-900'
-                  : 'text-white/60 hover:text-white hover:bg-white/10'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white'
               }`}
             >
               {tab.label}
