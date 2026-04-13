@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Home, BookmarkCheck, BarChart3, Users, Menu, Bell, Inbox,
+  Home, BookmarkCheck, Users, Menu, Bell, Inbox,
   FilePlus, UserCircle, FileText, Settings, LogOut, X,
   ChevronDown, Building, Briefcase, Mail, MessageSquare,
 } from 'lucide-react';
@@ -171,15 +171,15 @@ const Header = ({
   const getNavigationItems = () => {
     if (!user || !user.isVerified) {
       // Basic navigation for unverified or logged out users
-      return ['home', 'jobs', 'about'];
+      return ['home', 'about'];
     }
 
     if (isCompanyUser) {
       // Company user navigation
-      return ['home'];
+      return ['home', 'postJob'];
     } else {
       // Job seeker navigation
-      return ['home', 'jobs', 'bookmarks', 'comparison', 'about'];
+      return ['home', 'bookmarks', 'about'];
     }
   };
 
@@ -189,9 +189,8 @@ const Header = ({
   const getNavigationIcon = (page) => {
     const icons = {
       'home': <Home className="w-4 h-4 mr-1" />,
-      'jobs': <Briefcase className="w-4 h-4 mr-1" />,
       'bookmarks': <BookmarkCheck className="w-4 h-4 mr-1" />,
-      'comparison': <BarChart3 className="w-4 h-4 mr-1" />,
+      'postJob': <FilePlus className="w-4 h-4 mr-1" />,
       'about': <Users className="w-4 h-4 mr-1" />,
     };
     return icons[page] || <Home className="w-4 h-4 mr-1" />;
@@ -201,9 +200,8 @@ const Header = ({
   const getNavigationDisplayName = (page) => {
     const names = {
       'home': 'Home',
-      'jobs': 'Jobs',
       'bookmarks': 'Bookmarks',
-      'comparison': 'Compare',
+      'postJob': 'Post Job',
       'about': 'About',
     };
     return names[page] || page.charAt(0).toUpperCase() + page.slice(1);
@@ -250,7 +248,13 @@ const Header = ({
             {navigationItems.map(page => (
               <button
                 key={page}
-                onClick={() => safeHandleNavigation(page)}
+                onClick={() => {
+                  if (page === 'postJob') {
+                    handlePostJob();
+                  } else {
+                    safeHandleNavigation(page);
+                  }
+                }}
                 className={`text-sm font-medium transition-colors duration-200 flex items-center ${
                   currentPage === page 
                     ? 'text-gray-900 border-b-2 border-gray-900' 
