@@ -33,10 +33,10 @@ import InterviewsPage from './companydashboard/InterviewsPage';
 import { MessagesPage } from './companydashboard/MessagesPage';
 import { NotificationsPage } from './companydashboard/NotificationsPage';
 import { TalentPoolPage } from './companydashboard/TalentPoolPage';
-
 import { PaymentsPage } from './companydashboard/PaymentsPage';
 import { AnalyticsPage } from './companydashboard/AnalyticsPage';
 import { SettingsPage } from './companydashboard/SettingsPage';
+import AIScreeningPage from './companydashboard/AIScreeningPage';
 
 export default function CompanyDashboard({ user: propUser, token: propToken }) {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -254,6 +254,7 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
       { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', color: 'blue', badge: null },
       { id: 'jobs', icon: Briefcase, label: 'Jobs', color: 'emerald', badge: jobs.length || null },
       { id: 'applicants', icon: Users, label: 'Applicants', color: 'purple', badge: allApplications.length || null },
+      { id: 'ai-screening', icon: Brain, label: 'AI Screening', color: 'violet', badge: null },
       { id: 'interviews', icon: Calendar, label: 'Interviews', color: 'amber', badge: null },
       { id: 'messages', icon: MessageSquare, label: 'Messages', color: 'indigo', badge: unreadMessages || null },
     ],
@@ -353,6 +354,7 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
           {currentPage === 'dashboard' && <DashboardPage user={user} showToast={showToast} onUpgrade={() => setShowPricing(true)} isPremium={isPremium} onNavigate={(page) => { handleQuickAction(page); }} />}
           {currentPage === 'jobs' && <JobsPage token={token} user={user} showToast={showToast} onViewApplicants={(job) => { setSelectedJobFilter(job); handleQuickAction('applicants'); }} />}
           {currentPage === 'applicants' && <ApplicantsPage token={token} user={user} showToast={showToast} talentPool={talentPool} setTalentPool={setTalentPool} setShowApplicant={setShowApplicantDetail} setShowMessage={setShowMessageModal} setShowAIMatching={setShowAIMatching} jobs={jobs} filterJob={selectedJobFilter} />}
+          {currentPage === 'ai-screening' && <AIScreeningPage token={token} showNotification={showToast} user={user} />}
           {currentPage === 'interviews' && <InterviewsPage token={token} user={user} showToast={showToast} />}
           {currentPage === 'messages' && <MessagesPage token={token} user={user} showToast={showToast} templates={messageTemplates} setShowTemplates={setShowTemplates} />}
           {currentPage === 'notifications' && <NotificationsPage token={token} user={user} showToast={showToast} onNavigate={(page) => handleQuickAction(page)} />}
