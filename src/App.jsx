@@ -10,7 +10,6 @@ import AboutSection from './components/AboutSection';
 import { UIHelpers } from './components/UIHelpers';
 import { Modals } from './components/Modals';
 import MobileMenu from './components/MobileMenu';
-import ChatAssistant from './components/ChatAssistant';
 import ProfilePanel from './components/ProfilePanel';
 import NotificationInboxSettingsPanels from './components/NotificationInboxSettingsPanels';
 import Adverse from './components/adverse';
@@ -240,14 +239,12 @@ class ProfileJobMatcher {
 const aiMatcher = new ProfileJobMatcher();
 
 const App = () => {
-  const chatEndRef = useRef(null);
   const [darkMode, setDarkMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
-  const [currentView, setCurrentView] = useState('grid');
+  const [currentView, setCurrentView] = useState('list');
   const [bookmarkedJobs, setBookmarkedJobs] = useState(new Set());
   const [comparisonJobs, setComparisonJobs] = useState([]);
   const [isListening, setIsListening] = useState(false);
@@ -264,17 +261,6 @@ const App = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [locationQuery, setLocationQuery] = useState('');
   const [appliedJobs, setAppliedJobs] = useState(new Set());
-  const [chatMessages, setChatMessages] = useState([
-    { 
-      id: 1, 
-      text: "Hi! I'm here to help you find your perfect job. What type of position are you looking for?", 
-      isUser: false,
-      timestamp: new Date(),
-      status: 'delivered'
-    }
-  ]);
-  const [newMessage, setNewMessage] = useState('');
-  const [aiThinking, setAiThinking] = useState(false);
   const [jobAlerts] = useState([
     { id: 1, title: "Senior React Developer", company: "TechCorp", match: 95, new: true },
     { id: 2, title: "Full Stack Engineer", company: "StartupXYZ", match: 87, new: true },
@@ -507,6 +493,31 @@ const App = () => {
         }));
         
         setBackendJobs(transformedJobs);
+        
+        // Add job match notifications automatically after jobs load
+        if (token && transformedJobs.length > 0) {
+          setTimeout(() => {
+            // Get first 5 jobs and add as job matches
+            const newNotifs = transformedJobs.slice(0, 5).map((job, index) => ({
+              id: `job_match_${job.id}_${Date.now()}`,
+              type: 'job_match',
+              title: `${job.title} Matches Your Profile!`,
+              message: `Great opportunity at ${job.company}. ${job.location}. ${job.type}.`,
+              date: new Date().toISOString(),
+              read: false,
+              jobId: job.id,
+              relatedId: job.id,
+              relatedType: 'job',
+              jobDetails: { jobId: job.id, title: job.title, company: job.company, location: job.location, salary: job.salary },
+              priority: 'normal'
+            }));
+            
+            setNotifications(prev => [...newNotifs, ...prev]);
+            setNotificationPanelOpen(true);
+            showNotification('Found job matches!', 'success');
+          }, 3000);
+        }
+        
         return transformedJobs;
       }
       return [];
@@ -716,6 +727,19 @@ const App = () => {
       ]);
       
       setDisplayedJobs(backendJobsData || []);
+      
+      // Run job matching after data loads
+      if (userToken && user?.userType === 'jobSeeker') {
+        setTimeout(async () => {
+          try {
+            await fetch(`${getApiBaseUrl()}/ai-matching/analyze-jobs`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userToken}` },
+              body: JSON.stringify({ minMatchScore: 50 })
+            });
+          } catch (e) {}
+        }, 5000);
+      }
       
       setTimeout(() => {
         setIsLoading(false);
@@ -1090,43 +1114,6 @@ const App = () => {
     }
   };
 
-  // Send chat message function
-  const sendMessage = () => {
-    if (!newMessage.trim()) return;
-    
-    const userMessage = {
-      id: chatMessages.length + 1,
-      text: newMessage,
-      isUser: true,
-      timestamp: new Date(),
-      status: 'sent'
-    };
-    
-    setChatMessages(prev => [...prev, userMessage]);
-    setNewMessage('');
-    setAiThinking(true);
-    
-    setTimeout(() => {
-      const responses = [
-        "I found several positions matching your criteria. Would you like me to show you the top matches?",
-        "Based on your profile, I recommend focusing on senior-level positions in technology.",
-        "I can help you refine your search. What specific skills are you looking to use?",
-        "Great! I've updated your job preferences. Let me find the perfect matches for you."
-      ];
-      
-      const aiResponse = {
-        id: chatMessages.length + 2,
-        text: responses[Math.floor(Math.random() * responses.length)],
-        isUser: false,
-        timestamp: new Date(),
-        status: 'delivered'
-      };
-      
-      setChatMessages(prev => [...prev, aiResponse]);
-      setAiThinking(false);
-    }, 2000);
-  };
-
   // Login handler
   const handleLogin = async (loginData) => {
     try {
@@ -1171,6 +1158,17 @@ const App = () => {
           // Fetch user data in background for non-company users
           fetchUserJobs(data.token).catch(console.error);
           fetchUserApplications(data.token).catch(console.error);
+          
+          // Auto-analyze jobs for matching after login
+          setTimeout(async () => {
+            try {
+              await fetch(`${getApiBaseUrl()}/ai-matching/analyze-jobs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data.token}` },
+                body: JSON.stringify({ minMatchScore: 50 })
+              });
+            } catch (e) { console.error('Job matching error:', e); }
+          }, 3000);
         }
         
         // Show welcome message (backend now creates notifications in database)
@@ -1558,6 +1556,167 @@ const App = () => {
     }
   };
 
+  // Manual trigger function
+  const triggerMatchingNow = async (jobsToMatch = backendJobs) => {
+    alert('Running AI Matching for ' + (jobsToMatch?.length || 0) + ' jobs with profile: ' + JSON.stringify(userProfile));
+    
+    if (!token || !jobsToMatch?.length) {
+      return;
+    }
+    
+    console.log('Starting matching with profile:', userProfile);
+    
+    const userSkills = Array.isArray(userProfile?.skills) 
+      ? userProfile.skills.map(s => String(s).toLowerCase()) 
+      : [];
+    const userExp = userProfile?.experience || userProfile?.yearsOfExperience || 0;
+    console.log('Running matching with', userSkills.length, 'skills');
+    
+    const matches = [];
+    
+    for (const job of jobsToMatch) {
+      const jobSkills = Array.isArray(job?.skills) 
+        ? job.skills.map(s => String(s).toLowerCase()) 
+        : [];
+      
+      const matched = userSkills.length > 0 
+        ? userSkills.filter(s => jobSkills.some(js=> (js||'').includes(s) || (s||'').includes(js)))
+        : [];
+      
+      const jobExpText = (job.experience || '').toLowerCase();
+      let expScore = 50;
+      if (jobExpText.includes('entry') || jobExpText.includes('junior')) expScore = 100;
+      else if (jobExpText.includes('mid')) expScore = userExp >= 2 ? 100 : 50;
+      else if (jobExpText.includes('senior')) expScore = userExp >= 5 ? 100 : 30;
+      
+      const skillScore = jobSkills.length > 0 && matched.length > 0 ? (matched.length / jobSkills.length) * 100 : 70;
+      const totalScore = (skillScore * 0.6) + (expScore * 0.3) + 10;
+      
+      if (totalScore >= 60) {
+        matches.push({ ...job, matchedSkills: matched, matchScore: totalScore });
+      }
+    }
+    
+    matches.sort((a, b) => b.matchScore - a.matchScore);
+    const top5 = matches.slice(0, 5);
+    
+    for (const job of top5) {
+      // Check for existing notification - use state directly
+      const currentNotifs = notifications || [];
+      const hasNotif = currentNotifs.some(n => n.jobId === job.id && n.type === 'job_match');
+      // Check for existing notification
+      if (!hasNotif) {
+        const notif = {
+          id: `ai_${job.id}_${Date.now()}`,
+          type: 'job_match',
+          title: `${job.title} Matches Your Profile!`,
+          message: `Great match! ${job.title} at ${job.company}. You match ${job.matchedSkills.length} skills.`,
+          date: new Date().toISOString(),
+          read: false,
+          jobId: job.id,
+          relatedId: job.id,
+          relatedType: 'job',
+          jobDetails: { jobId: job.id, title: job.title, company: job.company, location: job.location, salary: job.salary },
+          priority: job.matchScore >= 80 ? 'high' : 'normal'
+        };
+        
+        setNotifications(prev => {
+          console.log('Adding notification for job', job.id);
+          return [notif, ...prev];
+        });
+        
+        // Skip saving to backend since endpoint doesn't exist - just use local state
+        // try {
+        //   await fetch(`${getApiBaseUrl()}/notifications`, {
+        //     method: 'POST',
+        //     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        //     body: JSON.stringify(notif)
+        //   });
+        // } catch (e) {}
+      }
+    }
+  };
+
+  // Trigger AI job matching when jobs or profile changes
+  React.useEffect(() => {
+    console.log('AI Effect check', { 
+      token: !!token, 
+      jobs: backendJobs.length, 
+      profile: !!userProfile,
+      skills: userProfile?.skills,
+      experience: userProfile?.experience 
+    });
+    
+    if (!token || !backendJobs.length || !userProfile) return;
+    
+    const doMatching = async () => {
+      console.log('Matching started, userProfile:', userProfile);
+      const userSkills = Array.isArray(userProfile?.skills) && userProfile.skills.length > 0
+        ? userProfile.skills.map(s => String(s).toLowerCase()) 
+        : [];
+      const userExp = userProfile?.experience || userProfile?.yearsOfExperience || 0;
+      console.log('User skills:', userSkills, 'Experience:', userExp);
+      
+      // Create matches for ANY jobs since profile might not have skills yet
+      const matches = [];
+      
+      for (const job of backendJobs) {
+        const jobSkills = Array.isArray(job.skills) 
+          ? job.skills.map(s => String(s).toLowerCase()) 
+          : [];
+        
+        const matched = userSkills.length > 0 
+          ? userSkills.filter(s => jobSkills.some(js => (js || '').includes(s) || (s || '').includes(js)))
+          : [];
+        
+        const jobExp = (job.experience || '').toLowerCase();
+        let expScore = 50;
+        if (jobExp.includes('entry') || jobExp.includes('junior')) expScore = 100;
+        else if (jobExp.includes('mid')) expScore = userExp >= 2 ? 100 : 50;
+        else if (jobExp.includes('senior')) expScore = userExp >= 5 ? 100 : 30;
+        
+        const skillScore = jobSkills.length > 0 && matched.length > 0 ? (matched.length / jobSkills.length) * 100 : 70;
+        // Lower threshold to 40 to match more jobs
+        const totalScore = (skillScore * 0.6) + (expScore * 0.3) + 10;
+        
+        // Accept any job with score >= 40 OR if user has no skills, match all jobs
+        if (totalScore >= 40 || userSkills.length === 0) {
+          matches.push({ ...job, matchedSkills: matched, matchScore: Math.max(totalScore, 60) });
+        }
+      }
+      
+      matches.sort((a, b) => b.matchScore - a.matchScore);
+      const top5 = matches.slice(0, 5);
+      
+      console.log('Found matches:', top5.length);
+      
+      for (const job of top5) {
+        const hasNotif = notifications.some(n => n.jobId === job.id && n.type === 'job_match');
+        
+        if (!hasNotif) {
+          const notif = {
+            id: `ai_${job.id}_${Date.now()}`,
+            type: 'job_match',
+            title: `${job.title} Matches Your Profile!`,
+            message: `Great match! ${job.title} at ${job.company}. You match ${job.matchedSkills.length} skills.`,
+            date: new Date().toISOString(),
+            read: false,
+            jobId: job.id,
+            relatedId: job.id,
+            relatedType: 'job',
+            jobDetails: { jobId: job.id, title: job.title, company: job.company, location: job.location, salary: job.salary },
+            priority: job.matchScore >= 80 ? 'high' : 'normal'
+          };
+          
+          // Only save to local state - backend notification system handled separately
+        }
+      }
+    };
+    
+    const timer = setTimeout(doMatching, 3000);
+    return () => clearTimeout(timer);
+  }, [token, backendJobs, userProfile]);
+
   // Mark message as read
   const markMessageAsRead = async (messageId) => {
     try {
@@ -1729,11 +1888,6 @@ const App = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  // Scroll to chat end effect
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages, chatOpen]);
 
   // Initial notifications effect
   useEffect(() => {
@@ -1937,8 +2091,30 @@ const App = () => {
               {isLoading && !isUserTyping && displayedJobs.length === 0 ? (
                 <Loader />
               ) : (
-                <>
-                  <div className={`grid gap-2 ${currentView === 'grid' ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-1'}`}>
+                <div className="mt-10">
+                  <div className="bg-white rounded-2xl border-2 border-slate-200 p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                      <p className="text-sm text-slate-900 font-semibold">
+                        {displayedJobs.length} jobs found
+                      </p>
+                      <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200">
+                        <button
+                          onClick={() => setCurrentView('grid')}
+                          className={`p-2 rounded-lg transition-all ${currentView === 'grid' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 hover:bg-white'}`}
+                          title="Grid View"
+                        >
+                          <Grid className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setCurrentView('list')}
+                          className={`p-2 rounded-lg transition-all ${currentView === 'list' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 hover:bg-white'}`}
+                          title="List View (horizontal)"
+                        >
+                          <List className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className={`grid gap-4 ${currentView === 'grid' ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-1'}`}>
                     {displayedJobs.length > 0 ? (
                       (showAllJobs ? displayedJobs : displayedJobs.slice(0, jobsPerPage)).map(job => (
                         <JobCard 
@@ -2003,8 +2179,11 @@ const App = () => {
                       </div>
                     </div>
                   )}
-                </>
+                  </div>
+                </div>
               )}
+
+              <div className="mt-16"></div>
 
               <AboutSection 
                 aboutStats={aboutStats}
@@ -2014,7 +2193,7 @@ const App = () => {
         );
       case 'jobs':
         return (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 bg-slate-50">
             <div className="mb-8">
               <h1 className="text-4xl font-bold text-slate-900 mb-2">All Jobs</h1>
               <p className="text-lg text-slate-600">Browse all available job opportunities</p>
@@ -2193,6 +2372,9 @@ const App = () => {
           
           <main className={user?.userType === 'company' ? "min-h-screen" : "min-h-[70vh]"}>
             {renderPage()}
+            
+            {/* Test Button */}
+            
           </main>
           
           {/* Conditionally render Footer only for non-company users */}
@@ -2237,18 +2419,6 @@ const App = () => {
             setLoginOpen={setLoginOpen}
             setRegisterOpen={setRegisterOpen}
             handleLogout={handleLogout}
-          />
-
-          <ChatAssistant 
-            chatOpen={chatOpen}
-            setChatOpen={setChatOpen}
-            chatMessages={chatMessages}
-            newMessage={newMessage}
-            setNewMessage={setNewMessage}
-            sendMessage={sendMessage}
-            aiThinking={aiThinking}
-            chatEndRef={chatEndRef}
-            formatTimestamp={formatTimestamp}
           />
 
           <ProfilePanel 

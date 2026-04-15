@@ -55,10 +55,12 @@ const NotificationPanel = ({
   markAllNotificationsAsRead,
   deleteNotification,
   navigateToRelatedContent,
-  unreadCount
+  unreadCount,
+  token: propToken
 }) => {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const token = propToken || localStorage.getItem('token') || '';
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown date';
@@ -156,90 +158,47 @@ const NotificationPanel = ({
   };
 
   return (
-    <div className={`fixed right-0 top-0 h-screen w-full md:w-[450px] lg:w-[500px] bg-gradient-to-b from-slate-50 to-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${notificationPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-      {/* Header with modern gradient */}
-      <div className="sticky top-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 z-10">
+    <div className={`fixed right-0 top-0 h-screen w-full md:w-[600px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${notificationPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      {/* Header with slate background */}
+      <div className="sticky top-0 bg-slate-800 p-5 z-10">
         <div className="flex justify-between items-center mb-5">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 bg-slate-700 rounded-xl flex items-center justify-center">
               <Bell className="w-6 h-6 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Notifications</h2>
-              <p className="text-white/50 text-xs">Stay updated on your activities</p>
+              <p className="text-slate-400 text-xs">Stay updated on your activities</p>
             </div>
           </div>
           <button 
             onClick={() => setNotificationPanelOpen(false)}
-            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 backdrop-blur-sm"
+            className="p-2.5 rounded-xl hover:bg-slate-700 transition-all"
           >
             <X className="w-5 h-5 text-white" />
           </button>
-        </div>
-
-        {/* Search and Filter */}
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" />
-            <input
-              type="text"
-              placeholder="Search notifications..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-white/20 backdrop-blur-sm"
-            />
-          </div>
-          
-          <div className="flex space-x-1.5 bg-white/10 rounded-xl p-1.5 backdrop-blur-sm">
-            {[
-              { id: 'all', label: 'All', count: notifications.length },
-              { id: 'unread', label: 'Unread', count: unreadCount },
-              { id: 'message', label: 'Messages', count: notifications.filter(n => n.type === 'message').length },
-              { id: 'application', label: 'Applications', count: notifications.filter(n => n.type === 'application').length },
-              { id: 'announcement', label: 'News', count: notifications.filter(n => n.type === 'announcement').length }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setFilter(tab.id)}
-                className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                  filter === tab.id
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                    : 'text-white/60 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                {tab.label}
-                {tab.count > 0 && (
-                  <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
-                    filter === tab.id ? 'bg-white/20 text-white' : 'bg-white/10 text-white/60'
-                  }`}>
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
       <div className="p-5">
         <div className="flex justify-between items-center mb-5">
           <div className="flex items-center gap-3">
-            <div className="px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full">
-              <h3 className="text-sm font-bold text-white flex items-center">
+            <div className="px-3 py-1.5 bg-slate-100 rounded-full">
+              <h3 className="text-sm font-bold text-slate-700 flex items-center">
                 {filteredNotifications.filter(n => !n.read).length} Unread
               </h3>
             </div>
             <p className="text-xs text-slate-500">Updates & alerts</p>
           </div>
-          {notifications.length > 0 && (
-            <button 
+          <div className="flex gap-2">
+            {markAllNotificationsAsRead && <button 
               onClick={markAllNotificationsAsRead}
-              className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all text-xs font-medium flex items-center shadow-lg hover:shadow-xl"
+              className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-all text-xs font-medium flex items-center"
             >
-              <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
+              <CheckSquare className="w-3.5 h-3.5 mr-1" />
               Mark all read
-            </button>
-          )}
+            </button>}
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -254,12 +213,12 @@ const NotificationPanel = ({
           ) : filteredNotifications.map(notification => (
             <div 
               key={notification.id || notification._id} 
-              className={`p-4 rounded-2xl border-2 transition-all duration-300 hover:shadow-xl cursor-pointer group ${
+              className={`p-4 rounded-xl border transition-all duration-300 hover:shadow-md cursor-pointer group ${
                 notification.read 
-                  ? 'bg-white border-slate-100 hover:border-slate-200' 
-                  : 'bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-l-indigo-500 border-slate-200'
+                  ? 'bg-white border-slate-200 hover:border-slate-300' 
+                  : 'bg-white border-l-4 border-l-slate-600 border-slate-200'
               } ${
-                notification.priority === 'high' ? 'border-l-4 border-l-red-500 bg-red-50' : ''
+                notification.priority === 'high' ? 'border-l-red-500 bg-red-50' : ''
               }`}
               onClick={() => {
                 const jobId = notification.relatedId || notification.jobDetails?.jobId;
@@ -273,14 +232,14 @@ const NotificationPanel = ({
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center flex-1">
-                  <div className={`p-3 rounded-2xl mr-3 ${getNotificationColor(notification.type)} shadow-lg`}>
+                  <div className={`p-3 rounded-xl mr-3 ${getNotificationColor(notification.type)}`}>
                     {getNotificationIcon(notification.type)}
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-indigo-600 transition-colors">
+                    <h4 className="font-bold text-slate-900 text-sm leading-tight">
                       {notification.title}
                     </h4>
-                    <p className="text-xs text-slate-500 mt-1.5 flex items-center">
+                    <p className="text-xs text-slate-500 mt-1 flex items-center">
                       <Clock className="w-3 h-3 mr-1" />
                       {formatDate(notification.date || notification.createdAt)}
                     </p>
@@ -783,43 +742,31 @@ const InboxPanel = ({
   };
 
   return (
-    <div className={`fixed right-0 top-0 h-screen w-full md:w-[450px] lg:w-[500px] bg-gradient-to-b from-slate-50 to-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${inboxPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-      {/* Header with modern gradient */}
-      <div className="sticky top-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 z-10">
+    <div className={`fixed right-0 top-0 h-screen w-full md:w-[600px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${inboxPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      {/* Header with slate background */}
+      <div className="sticky top-0 bg-slate-800 p-5 z-10">
         <div className="flex justify-between items-center mb-5">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 bg-slate-700 rounded-xl flex items-center justify-center">
               <MessageSquare className="w-6 h-6 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Messages</h2>
-              <p className="text-white/50 text-xs">Communicate with others</p>
+              <p className="text-slate-400 text-xs">Communicate with others</p>
             </div>
           </div>
           <button 
             onClick={() => setInboxPanelOpen(false)}
-            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 backdrop-blur-sm"
+            className="p-2.5 rounded-xl hover:bg-slate-700 transition-all"
           >
             <X className="w-5 h-5 text-white" />
           </button>
         </div>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" />
-          <input
-            type="text"
-            placeholder="Search conversations..."
-            value={messageSearch}
-            onChange={(e) => setMessageSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-white/20 backdrop-blur-sm"
-          />
-        </div>
       </div>
 
-      {/* Message Tabs - Modern design */}
-      <div className="px-5 py-4 bg-white border-b border-slate-100">
-        <div className="flex space-x-1.5 bg-slate-100 rounded-xl p-1.5">
+      {/* Message Tabs */}
+      <div className="px-5 py-4 bg-white border-b border-slate-200">
+        <div className="flex space-x-1 bg-slate-100 rounded-lg p-1">
           {[
             { id: 'all', label: 'All', count: userMessages.length },
             { id: 'unread', label: 'Unread', count: userMessages.filter(m => !m.read).length },
@@ -829,20 +776,13 @@ const InboxPanel = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
+              className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-all ${
                 activeTab === tab.id
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               {tab.label}
-              {tab.count > 0 && (
-                <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
-                  activeTab === tab.id ? 'bg-slate-900/20 text-slate-900' : 'bg-white/10 text-white/60'
-                }`}>
-                  {tab.count}
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -853,7 +793,7 @@ const InboxPanel = ({
         {!selectedMessage && !showNewMessageForm && (
           <button
             onClick={() => setShowNewMessageForm(true)}
-            className="w-full mb-4 px-4 py-3 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl hover:from-slate-700 to-slate-900 transition-all font-medium flex items-center justify-center shadow-lg shadow-slate-200"
+            className="w-full mb-4 px-4 py-3 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition-all font-medium flex items-center justify-center"
           >
             <MessageSquare className="w-4 h-4 mr-2" />
             Compose New Message

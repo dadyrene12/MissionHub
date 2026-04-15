@@ -17,9 +17,9 @@ const MobileMenu = ({
   <div className={`fixed inset-0 z-50 transform ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 ease-in-out bg-white`}>
     <div className="h-full flex flex-col p-6">
       <div className="flex justify-between items-center mb-8">
-        <span className="text-2xl font-extrabold text-gray-900">Menu</span>
-        <button onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-full hover:bg-gray-100">
-          <X className="w-8 h-8 text-gray-500" />
+        <span className="text-2xl font-extrabold text-slate-900">Menu</span>
+        <button onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-full hover:bg-slate-100">
+          <X className="w-8 h-8 text-slate-500" />
         </button>
       </div>
       <nav className="flex flex-col space-y-4 text-xl flex-1">
@@ -30,7 +30,7 @@ const MobileMenu = ({
             className={`text-left py-3 font-semibold flex items-center ${
               currentPage === page 
                 ? 'text-blue-600 border-l-4 border-blue-600 pl-4' 
-                : 'text-gray-700 hover:text-blue-600'
+                : 'text-slate-700 hover:text-blue-600'
             }`}
           >
             {page === 'home' && <Home className="w-6 h-6 mr-3" />}
@@ -54,7 +54,7 @@ const MobileMenu = ({
           </button>
         )}
       </nav>
-      <div className="pt-6 border-t border-gray-200">
+      <div className="pt-6 border-t border-slate-200">
         {user ? (
           <button 
             onClick={handleLogout}

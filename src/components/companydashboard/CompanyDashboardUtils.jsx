@@ -7,7 +7,7 @@ import {
   Linkedin, Github, ExternalLink, FileUp, Trash2, Edit2, Cpu, 
   Clock, Globe, User, Download, MessageSquare, Send, ChevronRight,
   MessageCircle, ThumbsUp, ThumbsDown, ExternalLink as ExternalLinkIcon,
-  Award, Grid, List, Bookmark
+  Award, Grid, List, Bookmark, UserPlus
 } from 'lucide-react';
 
 // API Configuration
@@ -160,26 +160,20 @@ export function ApplicantDetailModal({ isOpen, onClose, applicant, onAction }) {
 
   const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'A';
 
-  // Get resume from multiple possible sources
+  const profile = applicant.userId?.profile || applicant.userId || {};
+  const user = applicant.userId || {};
+
   const getResumeData = () => {
     if (applicant.resume?.url) return applicant.resume;
     if (applicant.userId?.profile?.resume?.url) return applicant.userId.profile.resume;
-    if (applicant.userId?.resume?.url) return applicant.userId.resume;
+    if (profile.resume?.url) return profile.resume;
+    if (user.resume?.url) return user.resume;
+    if (profile.profile?.resume?.url) return profile.profile.resume;
+    if (user.profile?.resume?.url) return user.profile.resume;
     return null;
   };
 
   const resumeData = getResumeData();
-
-  const getStatusBadge = (status) => {
-    const colors = {
-      pending: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Pending' },
-      reviewed: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Reviewed' },
-      approved: { bg: 'bg-green-100', text: 'text-green-700', label: 'Approved' },
-      rejected: { bg: 'bg-red-100', text: 'text-red-700', label: 'Rejected' },
-    };
-    const c = colors[status] || colors.pending;
-    return <span className={`px-3 py-1 rounded-full text-xs font-semibold ${c.bg} ${c.text}`}>{c.label}</span>;
-  };
 
   const handleViewCV = () => {
     if (resumeData?.url) {
@@ -202,171 +196,276 @@ export function ApplicantDetailModal({ isOpen, onClose, applicant, onAction }) {
     }
   };
 
-  const statusColors = {
-    approved: 'from-green-500 to-emerald-500',
-    rejected: 'from-red-500 to-rose-500',
-    reviewed: 'from-blue-500 to-indigo-500',
-    pending: 'from-amber-500 to-orange-500',
+  const statusConfig = {
+    approved: { gradient: 'from-emerald-500 to-teal-500', badge: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+    rejected: { gradient: 'from-red-500 to-rose-600', badge: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
+    reviewed: { gradient: 'from-blue-500 to-indigo-600', badge: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+    pending: { gradient: 'from-amber-500 to-orange-500', badge: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
   };
+  const currentStatus = statusConfig[applicant.status] || statusConfig.pending;
+
+  const skills = Array.isArray(applicant.skills) ? applicant.skills : 
+                 Array.isArray(profile.skills) ? profile.skills : 
+                 Array.isArray(user.skills) ? user.skills : [];
+  
+  const experienceYears = typeof applicant.experience === 'object' ? applicant.experience.years : 
+                          typeof profile.experience === 'object' ? profile.experience.years :
+                          parseInt(applicant.experience || profile.experience || user.experience || 0);
+  
+  const experienceSummary = typeof applicant.experience === 'object' ? applicant.experience.summary : 
+                            typeof profile.experience === 'object' ? profile.experience.summary :
+                            applicant.experience || profile.experience || user.experience || '';
+  
+  const educationDegree = typeof applicant.education === 'object' ? applicant.education.degree :
+                         typeof profile.education === 'object' ? profile.education.degree :
+                         applicant.education || profile.education || user.education || '';
+  
+  const phone = applicant.phone || profile.phone || user.phone || '';
+  const location = applicant.location || profile.location || user.location || '';
+  const linkedIn = applicant.linkedIn || profile.linkedIn || user.linkedIn || '';
+  const email = applicant.userId?.email || user.email || applicant.email || '';
+  const name = applicant.userId?.name || user.name || applicant.name || 'Unknown';
 
   return (
-    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl w-full max-w-3xl my-4 sm:my-8 border border-slate-200 shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
         {/* Header */}
-        <div className="bg-white border-b border-slate-200 p-5 sm:p-6">
-          <div className="flex items-center justify-between">
+        <div className="relative bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-5 flex-shrink-0">
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-slate-700 to-transparent rounded-full opacity-30" />
+            <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-slate-700 to-transparent rounded-full opacity-30" />
+          </div>
+          
+          <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br ${statusColors[applicant.status] || statusColors.pending} flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shadow-lg`}>
-                {getInitials(applicant.userId?.name || applicant.name)}
+              <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${currentStatus.gradient} flex items-center justify-center text-white text-xl font-bold shadow-xl ring-4 ring-white/10`}>
+                {getInitials(name)}
               </div>
               <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <h3 className="text-xl sm:text-2xl font-bold text-slate-950">{applicant.userId?.name || applicant.name}</h3>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    applicant.status === 'approved' ? 'bg-green-100 text-green-700' :
-                    applicant.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                    applicant.status === 'reviewed' ? 'bg-blue-100 text-blue-700' :
-                    'bg-amber-100 text-amber-700'
-                  }`}>{applicant.status}</span>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-xl font-bold text-white">{name}</h3>
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${currentStatus.badge}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${currentStatus.dot}`} />
+                    {applicant.status?.charAt(0).toUpperCase() + applicant.status?.slice(1)}
+                  </span>
                 </div>
-                <p className="text-slate-600 text-sm font-medium">{applicant.jobId?.title || applicant.jobTitle}</p>
-                <p className="text-slate-400 text-xs mt-1">Applied {new Date(applicant.createdAt).toLocaleDateString()}</p>
+                <div className="flex items-center gap-4 text-slate-400 text-sm">
+                  <span className="flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5" />
+                    {applicant.jobId?.title || applicant.jobTitle || 'Position'}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    {new Date(applicant.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-              <X className="w-6 h-6 text-slate-500" />
+            <button onClick={onClose} className="w-9 h-9 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-all">
+              <X className="w-5 h-5 text-white" />
             </button>
           </div>
         </div>
-        
-        {/* Content */}
-        <div className="p-5 sm:p-6 overflow-y-auto max-h-[calc(100vh-320px)] space-y-6">
-          
-          {/* CV Section - Prominent */}
-          {resumeData ? (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
-                    <FileText className="w-7 h-7 text-white" />
+
+        {/* Body - Scrollable */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex flex-col lg:flex-row">
+            {/* Left Sidebar */}
+            <div className="w-full lg:w-72 bg-slate-50 border-r border-slate-200 p-5 space-y-4">
+              {/* Stats */}
+              <div className="grid grid-cols-3 lg:grid-cols-1 gap-2">
+                <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                  <div className="w-8 h-8 bg-slate-900 rounded-md flex items-center justify-center mx-auto mb-1.5">
+                    <Award className="w-4 h-4 text-white" />
                   </div>
-                  <div>
-                    <p className="text-slate-950 font-bold text-lg">{resumeData.name || 'Resume.pdf'}</p>
-                    <p className="text-slate-500 text-sm">Click to view full CV document</p>
+                  <p className="text-lg font-bold text-slate-900">{skills.length}</p>
+                  <p className="text-[10px] text-slate-500">Skills</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                  <div className="w-8 h-8 bg-slate-900 rounded-md flex items-center justify-center mx-auto mb-1.5">
+                    <Briefcase className="w-4 h-4 text-white" />
+                  </div>
+                  <p className="text-lg font-bold text-slate-900">{experienceYears || 0}</p>
+                  <p className="text-[10px] text-slate-500">Years Exp.</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                  <div className="w-8 h-8 bg-slate-900 rounded-md flex items-center justify-center mx-auto mb-1.5">
+                    <Star className="w-4 h-4 text-white" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-900 truncate">{educationDegree || 'N/A'}</p>
+                  <p className="text-[10px] text-slate-500">Education</p>
+                </div>
+              </div>
+
+              {/* Contact Info */}
+              <div className="bg-white rounded-lg p-4 border border-slate-200">
+                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-slate-500" /> Contact Info
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
+                      <Mail className="w-3.5 h-3.5 text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[9px] text-slate-400 uppercase">Email</p>
+                      <p className="text-xs text-slate-800 break-all">{email || 'Not provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 bg-emerald-100 rounded-md flex items-center justify-center flex-shrink-0">
+                      <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-400 uppercase">Phone</p>
+                      <p className="text-xs text-slate-800">{phone || 'Not provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 bg-amber-100 rounded-md flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-400 uppercase">Location</p>
+                      <p className="text-xs text-slate-800">{location || 'Not provided'}</p>
+                    </div>
+                  </div>
+                  {linkedIn && (
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-7 h-7 bg-indigo-100 rounded-md flex items-center justify-center flex-shrink-0">
+                        <Globe className="w-3.5 h-3.5 text-indigo-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[9px] text-slate-400 uppercase">LinkedIn</p>
+                        <p className="text-xs text-slate-800 break-all">{linkedIn}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Resume */}
+              <div className="bg-white rounded-lg p-4 border border-slate-200">
+                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-slate-500" /> Resume
+                </h4>
+                {resumeData ? (
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-md border border-indigo-100">
+                      <div className="w-8 h-8 bg-indigo-500 rounded-md flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-900 truncate">{resumeData.name || 'Resume.pdf'}</p>
+                        <p className="text-[10px] text-slate-500">PDF Document</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={handleViewCV} className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs rounded-md font-medium flex items-center justify-center gap-1.5 transition-all">
+                        <Eye className="w-3 h-3" /> View
+                      </button>
+                      <button onClick={handleDownloadCV} className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-md font-medium flex items-center justify-center gap-1.5 transition-all border border-slate-200">
+                        <Download className="w-3 h-3" /> Download
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-2.5 bg-slate-100 rounded-md">
+                    <FileText className="w-4 h-4 text-slate-400" />
+                    <span className="text-xs text-slate-500">No resume attached</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 p-5 space-y-4">
+              {/* Skills */}
+              {skills.length > 0 && (
+                <div className="bg-white rounded-lg p-4 border border-slate-200">
+                  <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5 text-amber-500" /> Professional Skills
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {skills.map((skill, idx) => (
+                      <span key={idx} className="px-2.5 py-1 bg-slate-900 text-white text-xs rounded-md font-medium">{skill}</span>
+                    ))}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={handleViewCV} className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm rounded-xl font-medium flex items-center gap-2 shadow-lg transition-all">
-                    <Eye className="w-4 h-4" /> View CV
-                  </button>
-                  <button onClick={handleDownloadCV} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all">
-                    <Download className="w-5 h-5" />
-                  </button>
+              )}
+
+              {/* Experience */}
+              <div className="bg-white rounded-lg p-4 border border-slate-200">
+                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                  <Briefcase className="w-3.5 h-3.5 text-blue-500" /> Work Experience
+                </h4>
+                {experienceSummary ? (
+                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{experienceSummary}</p>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">No experience details provided</p>
+                )}
+              </div>
+
+              {/* Education */}
+              <div className="bg-white rounded-lg p-4 border border-slate-200">
+                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5 text-purple-500" /> Education
+                </h4>
+                {educationDegree ? (
+                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{educationDegree}</p>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">No education details provided</p>
+                )}
+              </div>
+
+              {/* Cover Letter */}
+              {applicant.coverLetter && (
+                <div className="bg-white rounded-lg p-4 border border-slate-200">
+                  <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-emerald-500" /> Cover Letter
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{applicant.coverLetter}</p>
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-center gap-3">
-              <FileText className="w-5 h-5 text-slate-400" />
-              <span className="text-slate-500 text-sm">No resume attached</span>
-            </div>
-          )}
+              )}
 
-          {/* Contact Info - Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-              <div className="flex items-center gap-2 mb-2">
-                <Mail className="w-4 h-4 text-blue-600" />
-                <p className="text-slate-500 text-xs font-medium">Email</p>
-              </div>
-              <p className="text-slate-950 text-sm font-semibold truncate">{applicant.userId?.email || applicant.email}</p>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-              <div className="flex items-center gap-2 mb-2">
-                <Phone className="w-4 h-4 text-emerald-600" />
-                <p className="text-slate-500 text-xs font-medium">Phone</p>
-              </div>
-              <p className="text-slate-950 text-sm font-semibold">{applicant.userId?.phone || applicant.phone || '-'}</p>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-              <div className="flex items-center gap-2 mb-2">
-                <MapPin className="w-4 h-4 text-amber-600" />
-                <p className="text-slate-500 text-xs font-medium">Location</p>
-              </div>
-              <p className="text-slate-950 text-sm font-semibold">{applicant.userId?.location || applicant.location || '-'}</p>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-              <div className="flex items-center gap-2 mb-2">
-                <Globe className="w-4 h-4 text-indigo-600" />
-                <p className="text-slate-500 text-xs font-medium">LinkedIn</p>
-              </div>
-              <p className="text-slate-950 text-sm font-semibold truncate">{applicant.linkedIn || '-'}</p>
+              {/* Additional Info */}
+              {applicant.aiScreening && (
+                <div className="bg-white rounded-lg p-4 border border-slate-200">
+                  <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                    <Brain className="w-3.5 h-3.5 text-violet-500" /> AI Screening
+                  </h4>
+                  <div className="p-3 bg-violet-50 rounded-md border border-violet-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-violet-700">Overall Score</p>
+                      <span className="text-sm font-bold text-violet-700">{applicant.aiScreening.overallScore || 0}%</span>
+                    </div>
+                    {applicant.aiScreening.summary && (
+                      <p className="text-xs text-violet-600">{applicant.aiScreening.summary}</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Skills */}
-          {(applicant.skills || []).length > 0 && (
-            <div>
-              <h4 className="text-sm font-bold text-slate-950 mb-3 flex items-center gap-2">
-                <Award className="w-5 h-5 text-amber-600" /> Skills
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {applicant.skills.map((skill, idx) => (
-                  <span key={idx} className="px-3 py-1.5 bg-slate-100 text-slate-700 text-sm rounded-lg font-medium border border-slate-200">{skill}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Experience */}
-          <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
-            <h4 className="text-sm font-bold text-slate-950 mb-3 flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-blue-600" /> Experience
-            </h4>
-            <p className="text-slate-600 text-sm leading-relaxed">
-              {applicant.experience || 'No experience details provided'}
-            </p>
-          </div>
-
-          {/* Education */}
-          <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
-            <h4 className="text-sm font-bold text-slate-950 mb-3 flex items-center gap-2">
-              <GraduationCap className="w-5 h-5 text-purple-600" /> Education
-            </h4>
-            <p className="text-slate-600 text-sm leading-relaxed">
-              {applicant.education || 'No education details provided'}
-            </p>
-          </div>
-
-          {/* Cover Letter */}
-          {applicant.coverLetter && (
-            <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
-              <h4 className="text-sm font-bold text-slate-950 mb-3 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-emerald-600" /> Cover Letter
-              </h4>
-              <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
-                {applicant.coverLetter}
-              </p>
-            </div>
-          )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="p-5 bg-slate-50 border-t border-slate-200">
-          <div className="flex gap-3">
-            <button onClick={() => onAction?.('message', applicant)} className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg transition-all">
-              <MessageSquare className="w-4 h-4" /> Message
+        {/* Footer Actions */}
+        <div className="px-5 py-4 bg-slate-900 border-t border-slate-700 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <button onClick={() => onAction?.('message', applicant)} className="flex-1 py-2.5 bg-white hover:bg-slate-100 text-slate-900 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
+              <MessageSquare className="w-3.5 h-3.5" /> Message
             </button>
-            {resumeData && (
-              <button onClick={handleViewCV} className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg transition-all">
-                <Eye className="w-4 h-4" /> View CV
-              </button>
-            )}
-            <button onClick={() => onAction?.('approved', applicant)} className="flex-1 py-3 bg-green-100 hover:bg-green-600 hover:text-white text-green-700 border border-green-200 rounded-xl font-semibold text-sm transition-all">
-              Approve
+            <button onClick={() => onAction?.('schedule', applicant)} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
+              <Calendar className="w-3.5 h-3.5" /> Schedule
             </button>
-            <button onClick={() => onAction?.('rejected', applicant)} className="flex-1 py-3 bg-red-100 hover:bg-red-600 hover:text-white text-red-700 border border-red-200 rounded-xl font-semibold text-sm transition-all">
-              Reject
+            <button onClick={() => onAction?.('talentpool', applicant)} className="py-2.5 px-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all" title="Add to Talent Pool">
+              <UserPlus className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => onAction?.('approved', applicant)} className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
+              <CheckCircle className="w-3.5 h-3.5" /> Approve
+            </button>
+            <button onClick={() => onAction?.('rejected', applicant)} className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
+              <XCircle className="w-3.5 h-3.5" /> Reject
             </button>
           </div>
         </div>

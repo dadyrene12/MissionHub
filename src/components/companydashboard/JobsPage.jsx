@@ -4,9 +4,11 @@ import {
   Users, Copy, Share2, Pause, Play, Clock, Search, Calendar, Tag,
   Loader2, Grid, List, ChevronDown, ChevronUp, FileText,
   ExternalLink, RefreshCw, Globe, Rocket, DollarSign, Building2,
-  Filter, ArrowRight, Mail, Check, XCircle, AlertCircle, MoreVertical
+  Filter, ArrowRight, Mail, Check, XCircle, AlertCircle, MoreVertical,
+  Wifi, AlertCircle as AlertCircleIcon, BookmarkCheck, Bookmark, Send
 } from 'lucide-react';
 import { apiFetch, Badge } from './CompanyDashboardUtils';
+import JobCard from '../JobCard';
 
 export const JobsPage = ({ token, user, showToast, onViewApplicants }) => {
   const [jobs, setJobs] = useState([]);
@@ -20,7 +22,7 @@ export const JobsPage = ({ token, user, showToast, onViewApplicants }) => {
   const [expandedJob, setExpandedJob] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [jobStats, setJobStats] = useState({});
-  const [viewMode, setViewMode] = useState('grid');
+  const [viewMode, setViewMode] = useState('list');
   const [sortBy, setSortBy] = useState('newest');
 
   const getDefaultFormData = () => ({
@@ -323,142 +325,109 @@ export const JobsPage = ({ token, user, showToast, onViewApplicants }) => {
           </button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredJobs.map((job) => {
             const stats = jobStats[job._id] || { total: 0, pending: 0, approved: 0, reviewed: 0 };
             const statusConfig = getStatusConfig(job.status);
             
+            const formatSalary = () => {
+              if (job.salaryMin && job.salaryMax) return `$${job.salaryMin.toLocaleString()} - $${job.salaryMax.toLocaleString()}`;
+              if (job.salaryMin) return `$${job.salaryMin.toLocaleString()}+`;
+              if (job.salaryMax) return `Up to $${job.salaryMax.toLocaleString()}`;
+              return 'Competitive';
+            };
+
             return (
-              <div 
-                key={job._id}
-                className="group bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-2xl hover:border-slate-300 transition-all duration-300"
-              >
-                {/* Header with gradient */}
-                <div className="relative p-5 pb-4">
-                  {/* Status Bar */}
-                  <div className={`absolute top-0 left-0 right-0 h-1 ${job.status === 'active' ? 'bg-slate-950' : job.status === 'paused' ? 'bg-amber-500' : job.status === 'draft' ? 'bg-slate-400' : 'bg-red-500'}`} />
-                  
-                  <div className="flex items-start justify-between gap-3 mt-2">
-                    <div className="flex-1 min-w-0">
-                      {/* Badges */}
-                      <div className="flex items-center gap-2 mb-3 flex-wrap">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg ${statusConfig.bg} ${statusConfig.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
-                          {statusConfig.label}
+              <div key={job._id} className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden transition-all hover:shadow-xl hover:border-indigo-200 hover:-translate-y-1 group">
+                <div className="relative p-5 bg-gradient-to-br from-slate-50 to-white">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      {job.remote && (
+                        <span className="px-2.5 py-1 bg-emerald-500 text-white text-xs font-semibold rounded-full flex items-center gap-1">
+                          <Wifi className="w-3 h-3" /> Remote
                         </span>
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-lg">
-                          {getTypeConfig(job.type).label}
+                      )}
+                      {job.urgent && (
+                        <span className="px-2.5 py-1 bg-rose-500 text-white text-xs font-semibold rounded-full flex items-center gap-1">
+                          <AlertCircleIcon className="w-3 h-3" /> Urgent
                         </span>
-                        {job.remote && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-lg">Remote</span>}
-                        {job.urgent && <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-lg animate-pulse">Urgent</span>}
-                      </div>
-                      
-                      {/* Title */}
-                      <h3 className="text-lg font-bold text-slate-950 line-clamp-1">{job.title}</h3>
-                      
-                      {/* Meta */}
-                      <div className="flex items-center gap-3 text-sm text-slate-500 mt-2">
-                        <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {job.location}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
-                        <span className="flex items-center gap-1"><Tag className="w-3.5 h-3.5" /> {job.category}</span>
-                      </div>
+                      )}
+                      <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${statusConfig.bg} ${statusConfig.text}`}>
+                        {statusConfig.label}
+                      </span>
                     </div>
-                    
-                    {/* Actions */}
-                    <div className="flex flex-col gap-1">
-                      <button onClick={() => openEdit(job)} className="p-2 bg-slate-100 hover:bg-slate-950 text-slate-600 hover:text-white rounded-lg transition-all">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setExpandedJob(expandedJob === job._id ? null : job._id)} className={`p-2 rounded-lg transition-all ${expandedJob === job._id ? 'bg-slate-950 text-white' : 'bg-slate-100 hover:bg-slate-950 text-slate-600 hover:text-white'}`}>
-                        {expandedJob === job._id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Stats Section */}
-                <div className="px-5 pb-4">
-                  <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl">
-                    <button onClick={() => openApplicantsModal(job)} className="text-center p-2 hover:bg-white rounded-lg transition-all group cursor-pointer">
-                      <Users className="w-5 h-5 text-slate-950 mx-auto mb-1.5 group-hover:scale-110 transition-transform" />
-                      <p className="text-xl font-bold text-slate-950">{stats.total}</p>
-                      <p className="text-[10px] text-slate-500 font-medium">Applicants</p>
-                    </button>
-                    <div className="text-center p-2">
-                      <Eye className="w-5 h-5 text-slate-950 mx-auto mb-1.5" />
-                      <p className="text-xl font-bold text-slate-950">{job.views || 0}</p>
-                      <p className="text-[10px] text-slate-500 font-medium">Views</p>
-                    </div>
-                    <div className="text-center p-2">
-                      <Clock className="w-5 h-5 text-slate-950 mx-auto mb-1.5" />
-                      <p className="text-xl font-bold text-slate-950">{stats.pending}</p>
-                      <p className="text-[10px] text-slate-500 font-medium">Pending</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="px-5 py-4 bg-slate-50/50 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {new Date(job.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => openApplicantsModal(job)} className="px-3 py-1.5 bg-slate-950 text-white text-xs font-medium rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5" /> Applicants
+                      <button onClick={() => openApplicantsModal(job)} className="w-8 h-8 bg-white hover:bg-indigo-50 rounded-lg flex items-center justify-center border border-slate-200 transition-colors" title="Applicants">
+                        <Users className="w-4 h-4 text-slate-600" />
                       </button>
+                      <button onClick={() => openEdit(job)} className="w-8 h-8 bg-white hover:bg-indigo-50 rounded-lg flex items-center justify-center border border-slate-200 transition-colors" title="Edit">
+                        <Edit2 className="w-4 h-4 text-slate-600" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${job.status === 'active' ? 'bg-slate-950' : job.status === 'paused' ? 'bg-amber-500' : 'bg-slate-400'}`}>
+                      <Briefcase className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-950 font-semibold text-xs truncate">{job.company}</p>
+                      <p className="text-slate-500 text-[10px]">{job.location}</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Expanded Section */}
-                {expandedJob === job._id && (
-                  <div className="px-5 pb-5 space-y-4 border-t border-slate-100 pt-4">
-                    {job.description && (
-                      <div className="bg-slate-50 rounded-xl p-4">
-                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Description</h4>
-                        <p className="text-sm text-slate-700 line-clamp-3">{job.description}</p>
-                      </div>
-                    )}
-
-                    {job.skills?.length > 0 && (
-                      <div>
-                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Skills</h4>
-                        <div className="flex flex-wrap gap-1.5">
-                          {job.skills.slice(0, 5).map((skill, idx) => (
-                            <span key={idx} className="px-2.5 py-1 bg-slate-950 text-white text-xs rounded-lg font-medium">{skill}</span>
-                          ))}
-                          {job.skills.length > 5 && (
-                            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs rounded-lg font-medium">+{job.skills.length - 5} more</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 flex-wrap">
-                      <button onClick={() => handleShare(job)} className="px-3 py-2 bg-slate-100 hover:bg-slate-950 hover:text-white text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
-                        <Share2 className="w-3.5 h-3.5" /> Share
-                      </button>
-                      <button onClick={() => handleDuplicate(job)} className="px-3 py-2 bg-slate-100 hover:bg-slate-950 hover:text-white text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
-                        <Copy className="w-3.5 h-3.5" /> Duplicate
-                      </button>
-                      {job.status === 'active' ? (
-                        <button onClick={() => handleStatusChange(job._id, 'paused')} className="px-3 py-2 bg-slate-100 hover:bg-slate-950 hover:text-white text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
-                          <Pause className="w-3.5 h-3.5" /> Pause
-                        </button>
-                      ) : job.status === 'paused' ? (
-                        <button onClick={() => handleStatusChange(job._id, 'active')} className="px-3 py-2 bg-slate-100 hover:bg-slate-950 hover:text-white text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
-                          <Play className="w-3.5 h-3.5" /> Resume
-                        </button>
-                      ) : null}
-                      <button onClick={() => handleDelete(job._id)} className="px-3 py-2 bg-red-50 hover:bg-red-500 hover:text-white text-red-600 rounded-lg text-xs font-medium flex items-center gap-1.5 ml-auto transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                      </button>
-                    </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-slate-950 text-sm leading-tight mb-2 line-clamp-2">
+                    {job.title}
+                  </h3>
+                  
+                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-medium rounded-md">{job.category}</span>
+                    <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{getTypeConfig(job.type).label}</span>
                   </div>
-                )}
+
+                  <p className="text-slate-600 text-xs mb-3 line-clamp-2">
+                    {job.description || 'No description'}
+                  </p>
+
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {(Array.isArray(job.skills) ? job.skills : []).slice(0, 3).map((skill, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] rounded-md">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="flex items-center gap-1 text-slate-500"><Users className="w-3.5 h-3.5" />{stats.total}</span>
+                      <span className="flex items-center gap-1 text-slate-500"><Eye className="w-3.5 h-3.5" />{job.views || 0}</span>
+                    </div>
+                    <span className="font-bold text-emerald-600 text-xs">{formatSalary()}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-3">
+                    {job.status === 'active' ? (
+                      <button onClick={() => handleStatusChange(job._id, 'paused')} className="flex-1 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-xs font-medium flex items-center justify-center gap-1 hover:bg-amber-200 transition-colors">
+                        <Pause className="w-3 h-3" /> Pause
+                      </button>
+                    ) : (
+                      <button onClick={() => handleStatusChange(job._id, 'active')} className="flex-1 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium flex items-center justify-center gap-1 hover:bg-emerald-200 transition-colors">
+                        <Play className="w-3 h-3" /> Activate
+                      </button>
+                    )}
+                    <button onClick={() => handleShare(job)} className="p-1.5 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors" title="Share">
+                      <Share2 className="w-3.5 h-3.5 text-slate-600" />
+                    </button>
+                    <button onClick={() => handleDuplicate(job)} className="p-1.5 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors" title="Duplicate">
+                      <Copy className="w-3.5 h-3.5 text-slate-600" />
+                    </button>
+                    <button onClick={() => handleDelete(job._id)} className="p-1.5 bg-red-50 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Delete">
+                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                    </button>
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -468,99 +437,76 @@ export const JobsPage = ({ token, user, showToast, onViewApplicants }) => {
           {filteredJobs.map((job) => {
             const stats = jobStats[job._id] || { total: 0, pending: 0, approved: 0, reviewed: 0 };
             const statusConfig = getStatusConfig(job.status);
+            const isExpanded = expandedJob === job._id;
             
+            const formatSalary = () => {
+              if (job.salaryMin && job.salaryMax) return `$${job.salaryMin.toLocaleString()} - $${job.salaryMax.toLocaleString()}`;
+              if (job.salaryMin) return `$${job.salaryMin.toLocaleString()}+`;
+              if (job.salaryMax) return `Up to $${job.salaryMax.toLocaleString()}`;
+              return 'Competitive';
+            };
+
+            const getCategoryColor = (cat) => {
+              const colors = { technology: 'bg-blue-100 text-blue-700', marketing: 'bg-purple-100 text-purple-700', sales: 'bg-emerald-100 text-emerald-700', finance: 'bg-amber-100 text-amber-700', design: 'bg-pink-100 text-pink-700', engineering: 'bg-cyan-100 text-cyan-700' };
+              return colors[cat] || 'bg-slate-100 text-slate-700';
+            };
+
             return (
-              <div key={job._id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-lg hover:border-slate-400 transition-all">
-                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                  {/* Icon */}
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${job.status === 'active' ? 'bg-slate-950' : job.status === 'paused' ? 'bg-amber-500' : 'bg-slate-400'}`}>
-                    <Briefcase className="w-7 h-7 text-white" />
-                  </div>
-                  
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg ${statusConfig.bg} ${statusConfig.text}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
-                        {statusConfig.label}
-                      </span>
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-lg">
-                        {getTypeConfig(job.type).label}
-                      </span>
-                      {job.remote && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-lg">Remote</span>}
-                      {job.urgent && <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-lg animate-pulse">Urgent</span>}
+              <div key={job._id} className="bg-white shadow rounded-xl overflow-hidden hover:shadow-lg transition-all">
+                <div className="p-4">
+                  <div className="flex items-start gap-4 mb-3">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${job.status === 'active' ? 'bg-slate-950' : job.status === 'paused' ? 'bg-amber-500' : 'bg-slate-400'}`}>
+                      <Briefcase className="w-6 h-6 text-white" />
                     </div>
-                    
-                    <h3 className="text-base font-bold text-slate-950">{job.title}</h3>
-                    
-                    <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
-                      <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {job.location}</span>
-                      <span className="flex items-center gap-1"><Tag className="w-3.5 h-3.5" /> {job.category}</span>
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="flex items-center gap-3 lg:mr-4">
-                    <div className="text-center px-4 py-2 bg-slate-50 rounded-xl border border-slate-200">
-                      <p className="text-lg font-bold text-slate-950">{stats.total}</p>
-                      <p className="text-[10px] text-slate-500 font-medium">Applicants</p>
-                    </div>
-                    <div className="text-center px-4 py-2 bg-slate-50 rounded-xl border border-slate-200">
-                      <p className="text-lg font-bold text-slate-950">{job.views || 0}</p>
-                      <p className="text-[10px] text-slate-500 font-medium">Views</p>
-                    </div>
-                    <div className="text-center px-4 py-2 bg-slate-50 rounded-xl border border-slate-200">
-                      <p className="text-lg font-bold text-slate-950">{stats.pending}</p>
-                      <p className="text-[10px] text-slate-500 font-medium">Pending</p>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => openApplicantsModal(job)} className="px-4 py-2 bg-slate-950 text-white rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-slate-800 transition-colors">
-                      <Users className="w-4 h-4" /> Applicants
-                    </button>
-                    <button onClick={() => openEdit(job)} className="p-2.5 bg-slate-100 hover:bg-slate-950 text-slate-600 hover:text-white rounded-xl transition-all">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => setExpandedJob(expandedJob === job._id ? null : job._id)} className={`p-2.5 rounded-xl transition-all ${expandedJob === job._id ? 'bg-slate-950 text-white' : 'bg-slate-100 hover:bg-slate-950 text-slate-600 hover:text-white'}`}>
-                      {expandedJob === job._id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                
-                {expandedJob === job._id && (
-                  <div className="mt-4 pt-4 border-t border-slate-200">
-                    {job.description && <p className="text-sm text-slate-700 mb-3">{job.description}</p>}
-                    {job.skills?.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-3">
-                        {job.skills.map((skill, idx) => (
-                          <span key={idx} className="px-2.5 py-1 bg-slate-950 text-white text-xs rounded-lg font-medium">{skill}</span>
-                        ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="text-base font-bold text-slate-950 truncate">{job.title}</h3>
+                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${getCategoryColor(job.category)}`}>{job.category}</span>
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${statusConfig.bg} ${statusConfig.text}`}>{statusConfig.label}</span>
+                        {job.remote && <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-emerald-100 text-emerald-700">Remote</span>}
+                        {job.urgent && <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-100 text-rose-700">Urgent</span>}
                       </div>
-                    )}
-                    <div className="flex gap-2 flex-wrap">
-                      <button onClick={() => handleShare(job)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-950 hover:text-white text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
-                        <Share2 className="w-3 h-3" /> Share
-                      </button>
-                      <button onClick={() => handleDuplicate(job)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-950 hover:text-white text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
-                        <Copy className="w-3 h-3" /> Duplicate
-                      </button>
-                      {job.status === 'active' ? (
-                        <button onClick={() => handleStatusChange(job._id, 'paused')} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-950 hover:text-white text-slate-700 rounded-lg text-xs font-medium transition-colors">
-                          <Pause className="w-3 h-3 inline mr-1" /> Pause
-                        </button>
-                      ) : job.status === 'paused' ? (
-                        <button onClick={() => handleStatusChange(job._id, 'active')} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-950 hover:text-white text-slate-700 rounded-lg text-xs font-medium transition-colors">
-                          <Play className="w-3 h-3 inline mr-1" /> Resume
-                        </button>
-                      ) : null}
-                      <button onClick={() => handleDelete(job._id)} className="px-3 py-1.5 bg-red-50 hover:bg-red-500 hover:text-white text-red-600 rounded-lg text-xs font-medium ml-auto transition-colors">
-                        <Trash2 className="w-3 h-3 inline mr-1" /> Delete
-                      </button>
+                      <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                        <span className="font-medium">{job.company}</span>
+                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>
+                        <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{getTypeConfig(job.type).label}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm flex-shrink-0">
+                      <div className="flex items-center gap-1"><Users className="w-4 h-4 text-slate-500" /><span className="font-bold text-slate-950">{stats.total}</span></div>
+                      <div className="flex items-center gap-1"><Eye className="w-4 h-4 text-slate-500" /><span className="font-bold text-slate-950">{job.views || 0}</span></div>
+                      <div className="flex items-center gap-1"><Clock className="w-4 h-4 text-amber-500" /><span className="font-bold text-amber-600">{stats.pending}</span></div>
+                      <span className="font-bold text-emerald-600">{formatSalary()}</span>
                     </div>
                   </div>
-                )}
+                  <p className="text-xs text-slate-600 line-clamp-1 ml-16">{job.description || 'No description'}</p>
+                </div>
+                <div className="px-4 pb-4 pt-2 border-t border-slate-100 flex items-center gap-2">
+                  <button onClick={() => openApplicantsModal(job)} className="px-3 py-1.5 bg-slate-950 text-white rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-slate-800 transition-colors">
+                    <Users className="w-3.5 h-3.5" /> Applicants
+                  </button>
+                  <button onClick={() => openEdit(job)} className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-slate-200 transition-colors">
+                    <Edit2 className="w-3.5 h-3.5" /> Edit
+                  </button>
+                  {job.status === 'active' ? (
+                    <button onClick={() => handleStatusChange(job._id, 'paused')} className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-amber-200 transition-colors">
+                      <Pause className="w-3.5 h-3.5" /> Pause
+                    </button>
+                  ) : (
+                    <button onClick={() => handleStatusChange(job._id, 'active')} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-emerald-200 transition-colors">
+                      <Play className="w-3.5 h-3.5" /> Activate
+                    </button>
+                  )}
+                  <button onClick={() => handleShare(job)} className="p-1.5 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors" title="Share">
+                    <Share2 className="w-3.5 h-3.5 text-slate-600" />
+                  </button>
+                  <button onClick={() => handleDuplicate(job)} className="p-1.5 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors" title="Duplicate">
+                    <Copy className="w-3.5 h-3.5 text-slate-600" />
+                  </button>
+                  <button onClick={() => handleDelete(job._id)} className="p-1.5 bg-red-50 rounded-lg hover:bg-red-500 hover:text-white transition-colors" title="Delete">
+                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -623,25 +569,38 @@ export const JobsPage = ({ token, user, showToast, onViewApplicants }) => {
                   <p className="text-slate-500">No applicants yet</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="grid sm:grid-cols-2 gap-4">
                   {jobApplicants.map((applicant) => {
                     const badge = getStatusBadge(applicant.status);
                     return (
-                      <div key={applicant._id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-                        <div className="w-12 h-12 bg-slate-950 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                          {getInitials(applicant.userId?.name)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-950">{applicant.userId?.name || 'Applicant'}</p>
-                          <p className="text-sm text-slate-500 truncate">{applicant.userId?.email || 'No email'}</p>
-                        </div>
-                        <div className="text-right">
-                          <span className={`inline-block px-3 py-1 rounded-lg text-xs font-bold ${badge.bg} ${badge.text}`}>
-                            {applicant.status}
-                          </span>
-                          <p className="text-xs text-slate-500 mt-1">
-                            {new Date(applicant.createdAt).toLocaleDateString()}
+                      <div key={applicant._id} className="bg-white border-2 border-slate-100 rounded-xl overflow-hidden hover:shadow-lg hover:border-indigo-200 transition-all">
+                        <div className="p-4">
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className="w-12 h-12 bg-slate-950 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                              {getInitials(applicant.userId?.name)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-slate-950 truncate">{applicant.userId?.name || 'Applicant'}</p>
+                              <p className="text-xs text-slate-500 truncate">{applicant.userId?.email || 'No email'}</p>
+                              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.bg} ${badge.text}`}>
+                                {applicant.status}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            Applied: {new Date(applicant.createdAt).toLocaleDateString()}
                           </p>
+                        </div>
+                        <div className="px-4 pb-4 pt-2 border-t border-slate-100 flex items-center gap-2">
+                          <button className="flex-1 px-3 py-1.5 bg-slate-950 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-1 hover:bg-slate-800 transition-colors">
+                            <Eye className="w-3.5 h-3.5" /> View
+                          </button>
+                          <button className="flex-1 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium flex items-center justify-center gap-1 hover:bg-emerald-200 transition-colors">
+                            <CheckCircle className="w-3.5 h-3.5" /> Approve
+                          </button>
+                          <button className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium flex items-center justify-center gap-1 hover:bg-red-500 hover:text-white transition-colors">
+                            <XCircle className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     );

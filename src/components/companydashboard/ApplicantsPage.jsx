@@ -21,7 +21,6 @@ export const ApplicantsPage = ({ token, user, showToast, talentPool, setTalentPo
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [schedulingApplicant, setSchedulingApplicant] = useState(null);
   const [allJobs, setAllJobs] = useState([]);
-  const [viewMode, setViewMode] = useState('grid');
   const [showAIMatchModal, setShowAIMatchModal] = useState(false);
   const [aiMatches, setAiMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(false);
@@ -39,7 +38,13 @@ export const ApplicantsPage = ({ token, user, showToast, talentPool, setTalentPo
     setLoading(true);
     const res = await apiFetch('/applications/for-my-jobs');
     if (res.ok) {
-      setApplications(res.data?.data || []);
+      const apps = res.data?.data || [];
+      const appsWithAI = apps.map(app => ({
+        ...app,
+        aiScore: app.aiScreening?.overallScore || 0,
+        aiData: app.aiScreening || null
+      }));
+      setApplications(appsWithAI);
     }
     setLoading(false);
   };
@@ -363,140 +368,122 @@ export const ApplicantsPage = ({ token, user, showToast, talentPool, setTalentPo
     setLoadingMatches(true);
     setShowAIMatchModal(true);
     
-    const normalizeText = (text) => String(text || '').toLowerCase().replace(/[^\w\s]/g, '');
-    
-    const calculateSkillMatch = (applicantSkills, jobSkills) => {
-      const normalizedJobSkills = (jobSkills || []).map(s => normalizeText(s));
-      const normalizedAppSkills = Array.isArray(applicantSkills) 
-        ? applicantSkills.map(s => normalizeText(s))
-        : [];
+    try {
+      const currentToken = localStorage.getItem('token') || token;
       
-      const matched = [];
-      const missing = [];
+      const res = await fetch(`${import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com/api'}/ai-matching/screening/screen-job-candidates`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentToken}`
+        },
+        body: JSON.stringify({ jobId: job._id })
+      });
       
-      for (const jobSkill of normalizedJobSkills) {
-        const found = normalizedAppSkills.find(appSkill => 
-          appSkill.includes(jobSkill) || jobSkill.includes(appSkill)
-        );
-        if (found) matched.push(jobSkill);
-        else missing.push(jobSkill);
-      }
+      const data = await res.json();
       
-      const score = normalizedJobSkills.length > 0 
-        ? Math.round((matched.length / normalizedJobSkills.length) * 100) 
-        : 50;
-      
-      return { 
-        score: isNaN(score) ? 0 : score, 
-        matched, 
-        missing,
-        matchedCount: matched.length,
-        totalRequired: normalizedJobSkills.length
-      };
-    };
-    
-    const calculateExperienceMatch = (appExperience, jobRequirements) => {
-      const appYears = parseInt(appExperience?.years || appExperience || '0') || 0;
-      const requiredYears = parseInt(jobRequirements?.minExperience || jobRequirements || '0') || 0;
-      
-      if (requiredYears === 0) return { score: 100, years: appYears, required: requiredYears, exceeds: true };
-      
-      let score = 100;
-      if (appYears >= requiredYears) {
-        const bonus = Math.min((appYears - requiredYears) * 2, 10);
-        score = Math.min(100 + bonus, 100);
+      if (data.success && data.results) {
+        const matchedApps = applications
+          .filter(app => (app.jobId?._id || app.jobId) === job._id)
+          .map(app => {
+            const aiResult = data.results.find(r => 
+              r.candidateId === app._id || 
+              r.candidateId === app.userId?._id
+            );
+            
+            if (aiResult) {
+              return {
+                ...app,
+                matchScore: {
+                  score: aiResult.overallScore || 0,
+                  skillScore: aiResult.skillsMatch?.score || 0,
+                  matchedSkills: aiResult.skillsMatch?.matchedSkills || [],
+                  missingSkills: aiResult.skillsMatch?.missingSkills || [],
+                  yearsExp: aiResult.experienceMatch?.yearsCandidate || 0,
+                  requiredExp: aiResult.experienceMatch?.yearsRequired || 0,
+                  eduScore: aiResult.educationMatch?.score || 0,
+                  education: aiResult.educationMatch?.candidate || 'Not specified',
+                  cvKeywords: aiResult.resumeAnalysis?.keywordsFound || [],
+                  aiData: aiResult
+                },
+                matchReasons: [
+                  ...(aiResult.strengths || []).slice(0, 2),
+                  aiResult.recommendation
+                ].filter(Boolean)
+              };
+            }
+            
+            return app;
+          })
+          .sort((a, b) => (b.matchScore?.score || 0) - (a.matchScore?.score || 0));
+        
+        setAiMatches(matchedApps);
       } else {
-        score = requiredYears > 0 ? Math.round((appYears / requiredYears) * 100) : 100;
-      }
-      
-      return { score: isNaN(score) ? 0 : score, years: appYears, required: requiredYears, exceeds: appYears >= requiredYears };
-    };
-    
-    const calculateEducationMatch = (appEducation, jobRequirements) => {
-      const levels = { 'high school': 1, 'associate': 2, 'bachelor': 3, 'masters': 4, 'master': 4, 'phd': 5, 'doctoral': 5, 'doctorate': 5 };
-      const appLevel = levels[normalizeText(appEducation)] || 2;
-      const requiredLevel = levels[normalizeText(jobRequirements?.education || '')] || 2;
-      const meets = appLevel >= requiredLevel;
-      let score = meets ? 100 : Math.round((appLevel / requiredLevel) * 100);
-      return { score: isNaN(score) ? 0 : score, level: appEducation || 'Not specified', meets };
-    };
-    
-    const calculateCVMatch = (cvText, jobSkills) => {
-      if (!cvText) return { score: 0, keywordsFound: [] };
-      const normalizedCV = normalizeText(cvText);
-      const keywordsFound = (jobSkills || []).filter(skill => normalizedCV.includes(normalizeText(skill)));
-      const score = (jobSkills || []).length > 0 
-        ? Math.round((keywordsFound.length / jobSkills.length) * 100) 
-        : 0;
-      return { 
-        score: isNaN(score) ? 0 : score, 
-        keywordsFound 
-      };
-    };
-    
-    const matchedApps = applications
-      .filter(app => app.jobId?._id === job._id || app.jobId === job._id)
-      .map(app => {
-        const skillMatch = calculateSkillMatch(app.skills, job.skills || job.requirements?.skills);
-        const expMatch = calculateExperienceMatch(app.experience, job.experience || job.requirements);
-        const eduMatch = calculateEducationMatch(app.education, job.requirements);
-        const cvMatch = calculateCVMatch(app.resume || app.coverLetter, job.skills || job.requirements?.skills);
+        showToast('AI screening not available, using local matching', 'info');
+        const normalizeText = (text) => String(text || '').toLowerCase().replace(/[^\w\s]/g, '');
         
-        let overallScore = Math.round(
-          (skillMatch.score * 0.40) +
-          (expMatch.score * 0.30) +
-          (eduMatch.score * 0.15) +
-          (cvMatch.score * 0.15)
-        );
-        overallScore = isNaN(overallScore) ? 0 : Math.max(0, Math.min(100, overallScore));
-        
-        const matchReasons = [];
-        
-        if (skillMatch.matchedCount > 0) {
-          const skillList = skillMatch.matched.slice(0, 3).join(', ');
-          matchReasons.push(`${skillMatch.matchedCount}/${skillMatch.totalRequired} skills matched: ${skillList}`);
-        }
-        
-        if (expMatch.years > 0) {
-          if (expMatch.exceeds) {
-            matchReasons.push(`${expMatch.years} years exp., ${expMatch.years - expMatch.required} more than required`);
-          } else {
-            matchReasons.push(`${expMatch.years} years exp., needs ${expMatch.required - expMatch.years} more`);
+        const calculateSkillMatch = (applicantSkills, jobSkills) => {
+          const normalizedJobSkills = (jobSkills || []).map(s => normalizeText(s));
+          const normalizedAppSkills = Array.isArray(applicantSkills) 
+            ? applicantSkills.map(s => normalizeText(s))
+            : [];
+          
+          const matched = [];
+          const missing = [];
+          
+          for (const jobSkill of normalizedJobSkills) {
+            const found = normalizedAppSkills.find(appSkill => 
+              appSkill.includes(jobSkill) || jobSkill.includes(appSkill)
+            );
+            if (found) matched.push(jobSkill);
+            else missing.push(jobSkill);
           }
-        }
-        
-        matchReasons.push(`${eduMatch.meets ? 'Meets' : 'Below'} education (${eduMatch.level})`);
-        
-        if (cvMatch.keywordsFound.length > 0) {
-          matchReasons.push(`CV mentions ${cvMatch.keywordsFound.length} relevant keywords`);
-        }
-        
-        if (skillMatch.missing.length > 0) {
-          matchReasons.push(`Missing skills: ${skillMatch.missing.slice(0, 2).join(', ')}`);
-        }
-        
-        return {
-          ...app,
-          matchScore: {
-            score: overallScore,
-            skillScore: skillMatch.score,
-            matchedSkills: skillMatch.matched,
-            missingSkills: skillMatch.missing,
-            yearsExp: expMatch.years,
-            requiredExp: expMatch.required,
-            eduScore: eduMatch.score,
-            education: eduMatch.level,
-            cvKeywords: cvMatch.keywordsFound
-          },
-          matchReasons
+          
+          const score = normalizedJobSkills.length > 0 
+            ? Math.round((matched.length / normalizedJobSkills.length) * 100) 
+            : 50;
+          
+          return { 
+            score: isNaN(score) ? 0 : score, 
+            matched, 
+            missing,
+            matchedCount: matched.length,
+            totalRequired: normalizedJobSkills.length
+          };
         };
-      })
-      .sort((a, b) => b.matchScore - a.matchScore);
-
-    setTimeout(() => {
-      setAiMatches(matchedApps);
-      setLoadingMatches(false);
-    }, 1500);
+        
+        const matchedApps = applications
+          .filter(app => app.jobId?._id === job._id || app.jobId === job._id)
+          .map(app => {
+            const skillMatch = calculateSkillMatch(app.skills, job.skills || job.requirements?.skills);
+            let overallScore = Math.round(skillMatch.score);
+            
+            return {
+              ...app,
+              matchScore: {
+                score: overallScore,
+                skillScore: skillMatch.score,
+                matchedSkills: skillMatch.matched,
+                missingSkills: skillMatch.missing,
+                yearsExp: parseInt(app.experience?.years || app.experience || '0'),
+                requiredExp: 0,
+                eduScore: 75,
+                education: app.education || 'Not specified',
+                cvKeywords: []
+              }
+            };
+          })
+          .sort((a, b) => b.matchScore.score - a.matchScore.score);
+        
+        setAiMatches(matchedApps);
+      }
+    } catch (error) {
+      console.error('AI Match Error:', error);
+      showToast('Error running AI analysis', 'error');
+      setAiMatches([]);
+    }
+    
+    setLoadingMatches(false);
   };
 
   const getStatusConfig = (status) => {
@@ -652,7 +639,7 @@ export const ApplicantsPage = ({ token, user, showToast, talentPool, setTalentPo
         </div>
       )}
 
-      {/* Applicants Grid */}
+      {/* Applicants List */}
       {filteredApps.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
           <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -662,316 +649,114 @@ export const ApplicantsPage = ({ token, user, showToast, talentPool, setTalentPo
           <p className="text-slate-600 text-sm">Try adjusting your filters or wait for new applications</p>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="space-y-3">
           {filteredApps.map((app) => {
-            const isExpanded = expandedApp === app._id;
             const isSelected = selectedApps.includes(app._id);
             const statusConfig = getStatusConfig(app.status);
             
             return (
-              <div 
-                key={app._id} 
-                className={`group bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-xl hover:border-slate-300 transition-all duration-300 ${isSelected ? 'ring-2 ring-slate-950' : ''}`}
-              >
-                {/* Header */}
-                <div className="relative p-5 pb-4">
-                  {/* Status Bar */}
-                  <div className={`absolute top-0 left-0 right-0 h-1 ${app.status === 'approved' ? 'bg-emerald-500' : app.status === 'rejected' ? 'bg-red-500' : app.status === 'reviewed' ? 'bg-blue-500' : 'bg-amber-500'}`} />
-                  
-                  {/* Select */}
-                  <input 
-                    type="checkbox" 
-                    checked={isSelected} 
-                    onChange={() => toggleSelect(app._id)} 
-                    className="absolute top-4 right-4 w-4 h-4 rounded border-slate-300 cursor-pointer" 
-                  />
-                  
-                  {/* Avatar & Info */}
-                  <div className="flex items-start gap-3 mt-2">
+              <div key={app._id} className={`bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all ${isSelected ? 'ring-2 ring-slate-950' : 'border border-slate-200'}`}>
+                <div className="p-4">
+                  <div className="flex items-start gap-4 mb-3">
                     <div className="relative">
-                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg ${statusConfig.bg}`}>
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold shadow-lg ${statusConfig.bg}`}>
                         {getInitials(app.userId?.name)}
                       </div>
                       {Number(app.matchScore?.score) > 0 && (
-                        <div className={`absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg ${
-                          Number(app.matchScore?.score) >= 80 ? 'bg-emerald-500 text-white' : 
-                          Number(app.matchScore?.score) >= 60 ? 'bg-amber-500 text-white' : 
-                          'bg-slate-400 text-white'
+                        <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow ${
+                          Number(app.matchScore?.score) >= 80 ? 'bg-emerald-500' : 
+                          Number(app.matchScore?.score) >= 60 ? 'bg-amber-500' : 
+                          'bg-slate-400'
                         }`}>
                           {Number(app.matchScore?.score) || 0}%
                         </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0 pr-6">
-                      <h3 className="text-base font-bold text-slate-950 truncate">{app.userId?.name || 'Applicant'}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-lg ${statusConfig.bg} ${statusConfig.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
-                          {statusConfig.label}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="text-base font-bold text-slate-950 truncate">{app.userId?.name || 'Applicant'}</h3>
+                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${statusConfig.bg} ${statusConfig.text}`}>{statusConfig.label}</span>
+                        <span className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-slate-100 text-slate-600 flex items-center gap-1">
+                          <Briefcase className="w-3 h-3" /> {app.jobId?.title || 'Position'}
                         </span>
                       </div>
-                    </div>
-                  </div>
-                  
-                  {/* Job */}
-                  <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
-                    <Briefcase className="w-4 h-4 text-slate-400" />
-                    <span className="truncate">{app.jobId?.title || 'Position'}</span>
-                  </div>
-                  
-                  {/* Meta */}
-                  <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
-                    <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> {app.userId?.email?.split('@')[0]}</span>
-                    <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {new Date(app.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-
-                {/* Quick Stats */}
-                <div className="px-5 pb-4">
-                  {/* Match Percentage - Prominent */}
-                  {Number(app.matchScore?.score) > 0 && (
-                    <div className="mb-3 p-3 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-slate-950 flex items-center gap-1">
-                          <Target className="w-4 h-4" /> AI Match Score
-                        </span>
-                        <span className={`text-xl font-bold ${Number(app.matchScore?.score) >= 80 ? 'text-emerald-600' : Number(app.matchScore?.score) >= 60 ? 'text-amber-600' : 'text-slate-600'}`}>
-                          {Number(app.matchScore?.score) || 0}%
-                        </span>
+                      <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                        <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{app.userId?.email}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(app.createdAt).toLocaleDateString()}</span>
                       </div>
-                      <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-500 ${Number(app.matchScore?.score) >= 80 ? 'bg-emerald-500' : Number(app.matchScore?.score) >= 60 ? 'bg-amber-500' : 'bg-slate-400'}`}
-                          style={{ width: `${Math.min(100, Math.max(0, Number(app.matchScore?.score) || 0))}%` }}
-                        />
+                    </div>
+                    <div className="flex items-center gap-4 text-sm flex-shrink-0">
+                      <div className="text-center">
+                        <p className="font-bold text-slate-950">{app.experience?.years || app.experience || 0}</p>
+                        <p className="text-[10px] text-slate-500">Years</p>
                       </div>
-                      {app.matchScore?.matchedSkills?.length > 0 && (
-                        <p className="text-[10px] text-slate-500 mt-1.5">
-                          {app.matchScore.matchedSkills.length} of {app.matchScore.matchedSkills.length + (app.matchScore.missingSkills?.length ?? 0)} skills matched
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl">
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-slate-950">{app.experience?.years || app.experience || 0}</p>
-                      <p className="text-[10px] text-slate-500">Years Exp.</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-slate-950">{Array.isArray(app.skills) ? app.skills.length : 0}</p>
-                      <p className="text-[10px] text-slate-500">Skills</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Skills */}
-                {Array.isArray(app.skills) && app.skills.length > 0 && (
-                  <div className="px-5 pb-4">
-                    <div className="flex flex-wrap gap-1">
-                      {app.skills.slice(0, 3).map((skill, idx) => (
-                        <span key={idx} className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded-lg font-medium">{skill}</span>
-                      ))}
-                      {app.skills.length > 3 && (
-                        <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs rounded-lg font-medium">+{app.skills.length - 3}</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div className="px-5 py-4 bg-slate-50/50 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-1">
-                      <button onClick={() => setShowApplicant?.(app)} className="p-2 bg-slate-100 hover:bg-slate-950 text-slate-600 hover:text-white rounded-lg transition-all" title="View">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setShowMessage?.({ open: true, recipient: app })} className="p-2 bg-slate-100 hover:bg-slate-950 text-slate-600 hover:text-white rounded-lg transition-all" title="Message">
-                        <MessageCircle className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => { setSchedulingApplicant(app); setShowScheduleModal(true); }} className="p-2 bg-slate-100 hover:bg-slate-950 text-slate-600 hover:text-white rounded-lg transition-all" title="Schedule">
-                        <Calendar className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="flex gap-1">
-                      {app.status !== 'approved' && (
-                        <button 
-                          onClick={() => openNotifyModal(app, 'approve')} 
-                          disabled={loadingActions[app._id] === 'approved'}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-emerald-500 text-white hover:bg-emerald-600 disabled:bg-emerald-300 flex items-center gap-1"
-                        >
-                          {loadingActions[app._id] === 'approved' ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin inline" /> Approving...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="w-3.5 h-3.5 inline" /> Approve
-                            </>
-                          )}
-                        </button>
-                      )}
-                      {app.status === 'approved' && (
-                        <button 
-                          onClick={() => handleStatusChange(app._id, 'pending')} 
-                          disabled={loadingActions[app._id] === 'pending'}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:bg-amber-200 flex items-center gap-1"
-                        >
-                          {loadingActions[app._id] === 'pending' ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin inline" /> Reverting...
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="w-3.5 h-3.5 inline" /> Revert
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Expanded Section */}
-                {isExpanded && (
-                  <div className="px-5 pb-5 border-t border-slate-100 pt-4 space-y-4">
-                    {Number(app.matchScore?.score) > 0 && (
-                      <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-xs font-semibold text-slate-950 uppercase tracking-wider flex items-center gap-1">
-                            <Brain className="w-3.5 h-3.5" /> AI Match Analysis
-                          </h4>
-                          <span className={`text-lg font-bold ${Number(app.matchScore?.score) >= 80 ? 'text-emerald-600' : Number(app.matchScore?.score) >= 60 ? 'text-amber-600' : 'text-slate-600'}`}>
+                      <div className="text-center">
+                        <p className="font-bold text-slate-950">{Array.isArray(app.skills) ? app.skills.length : 0}</p>
+                        <p className="text-[10px] text-slate-500">Skills</p>
+                      </div>
+                      {Number(app.matchScore?.score) > 0 && (
+                        <div className="text-center">
+                          <p className={`font-bold ${Number(app.matchScore?.score) >= 80 ? 'text-emerald-600' : Number(app.matchScore?.score) >= 60 ? 'text-amber-600' : 'text-slate-600'}`}>
                             {Number(app.matchScore?.score) || 0}%
-                          </span>
+                          </p>
+                          <p className="text-[10px] text-slate-500">Match</p>
                         </div>
-                        
-                        {/* Score Breakdown */}
-                        <div className="grid grid-cols-4 gap-2 mb-3">
-                          <div className="bg-white rounded-lg p-2 text-center">
-                            <p className={`text-sm font-bold ${(app.matchScore?.skillScore ?? 0) >= 70 ? 'text-emerald-600' : (app.matchScore?.skillScore ?? 0) >= 50 ? 'text-amber-600' : 'text-slate-600'}`}>
-                              {app.matchScore?.skillScore ?? 0}%
-                            </p>
-                            <p className="text-[9px] text-slate-500">Skills</p>
-                          </div>
-                          <div className="bg-white rounded-lg p-2 text-center">
-                            <p className={`text-sm font-bold ${(app.matchScore?.yearsExp ?? 0) >= (app.matchScore?.requiredExp ?? 0) ? 'text-emerald-600' : 'text-amber-600'}`}>
-                              {app.matchScore?.yearsExp ?? 0}
-                            </p>
-                            <p className="text-[9px] text-slate-500">Years</p>
-                          </div>
-                          <div className="bg-white rounded-lg p-2 text-center">
-                            <p className={`text-sm font-bold ${(app.matchScore?.eduScore ?? 0) >= 80 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                              {app.matchScore?.eduScore ?? 0}%
-                            </p>
-                            <p className="text-[9px] text-slate-500">Education</p>
-                          </div>
-                          <div className="bg-white rounded-lg p-2 text-center">
-                            <p className="text-sm font-bold text-slate-700">
-                              {app.matchScore?.matchedSkills?.length ?? 0}/{app.matchScore?.missingSkills?.length ?? 0}
-                            </p>
-                            <p className="text-[9px] text-slate-500">Match</p>
-                          </div>
-                        </div>
-                        
-                        {/* Matched Skills */}
-                        {app.matchScore?.matchedSkills?.length > 0 && (
-                          <div className="mb-2">
-                            <p className="text-[10px] text-emerald-600 font-semibold mb-1">Matched Skills:</p>
-                            <div className="flex flex-wrap gap-1">
-                              {app.matchScore.matchedSkills.slice(0, 6).map((skill, idx) => (
-                                <span key={idx} className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] rounded-md font-medium">
-                                  {skill}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Missing Skills */}
-                        {app.matchScore?.missingSkills?.length > 0 && (
-                          <div>
-                            <p className="text-[10px] text-amber-600 font-semibold mb-1">Missing Skills:</p>
-                            <div className="flex flex-wrap gap-1">
-                              {app.matchScore.missingSkills.slice(0, 4).map((skill, idx) => (
-                                <span key={idx} className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] rounded-md font-medium">
-                                  {skill}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {app.coverLetter && (
-                      <div className="bg-slate-50 rounded-xl p-4">
-                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Cover Letter</h4>
-                        <p className="text-sm text-slate-700 line-clamp-3">{app.coverLetter}</p>
-                      </div>
-                    )}
-                    
-                    {Array.isArray(app.skills) && app.skills.length > 0 && (
-                      <div>
-                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">All Skills</h4>
-                        <div className="flex flex-wrap gap-1">
-                          {app.skills.map((skill, idx) => (
-                            <span key={idx} className="px-2.5 py-1 bg-slate-950 text-white text-xs rounded-lg font-medium">{skill}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 flex-wrap">
-                      <button onClick={() => handleAddToTalentPool(app)} className="px-3 py-2 bg-violet-100 hover:bg-violet-500 text-violet-700 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all">
-                        <UserPlus className="w-3.5 h-3.5" /> Talent Pool
-                      </button>
-                      {app.status !== 'rejected' && (
-                        <button 
-                          onClick={() => openNotifyModal(app, 'reject')} 
-                          disabled={loadingActions[app._id] === 'rejected'}
-                          className="px-3 py-2 bg-red-100 hover:bg-red-500 text-red-700 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all disabled:bg-red-300 disabled:text-red-800"
-                        >
-                          {loadingActions[app._id] === 'rejected' ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Rejecting...
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="w-3.5 h-3.5" /> Reject
-                            </>
-                          )}
-                        </button>
-                      )}
-                      {app.status === 'rejected' && (
-                        <button 
-                          onClick={() => handleStatusChange(app._id, 'pending')} 
-                          disabled={loadingActions[app._id] === 'pending'}
-                          className="px-3 py-2 bg-amber-100 hover:bg-amber-500 text-amber-700 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all disabled:bg-amber-200 disabled:text-amber-800"
-                        >
-                          {loadingActions[app._id] === 'pending' ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Reverting...
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="w-3.5 h-3.5" /> Revert
-                            </>
-                          )}
-                        </button>
                       )}
                     </div>
                   </div>
-                )}
-
-                {/* Expand Toggle */}
-                <button 
-                  onClick={() => setExpandedApp(isExpanded ? null : app._id)} 
-                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium flex items-center justify-center gap-1 transition-colors"
-                >
-                  {isExpanded ? 'Show Less' : 'Show More'}
-                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                </button>
+                  <div className="flex flex-wrap gap-1 mb-3 ml-16">
+                    {Array.isArray(app.skills) && app.skills.slice(0, 4).map((skill, idx) => (
+                      <span key={idx} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] rounded-md">{skill}</span>
+                    ))}
+                    {Array.isArray(app.skills) && app.skills.length > 4 && (
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] rounded-md">+{app.skills.length - 4}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="px-4 pb-4 pt-2 border-t border-slate-100 flex items-center gap-2">
+                  <button onClick={() => setShowApplicant?.(app)} className="px-3 py-1.5 bg-slate-950 text-white rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-slate-800 transition-colors">
+                    <Eye className="w-3.5 h-3.5" /> View
+                  </button>
+                  <button onClick={() => setShowMessage?.({ open: true, recipient: app })} className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-slate-200 transition-colors">
+                    <MessageCircle className="w-3.5 h-3.5" /> Message
+                  </button>
+                  <button onClick={() => { setSchedulingApplicant(app); setShowScheduleModal(true); }} className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-slate-200 transition-colors">
+                    <Calendar className="w-3.5 h-3.5" /> Schedule
+                  </button>
+                  {app.status !== 'approved' ? (
+                    <button 
+                      onClick={() => openNotifyModal(app, 'approve')} 
+                      disabled={loadingActions[app._id] === 'approved'}
+                      className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-emerald-600 disabled:bg-emerald-300 transition-colors"
+                    >
+                      {loadingActions[app._id] === 'approved' ? (
+                        <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Approving...</>
+                      ) : (
+                        <><CheckCircle className="w-3.5 h-3.5" /> Approve</>
+                      )}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleStatusChange(app._id, 'pending')} 
+                      disabled={loadingActions[app._id] === 'pending'}
+                      className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-amber-200 disabled:bg-amber-200 transition-colors"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> Revert
+                    </button>
+                  )}
+                  {app.status !== 'rejected' && (
+                    <button 
+                      onClick={() => openNotifyModal(app, 'reject')} 
+                      disabled={loadingActions[app._id] === 'rejected'}
+                      className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-red-200 disabled:bg-red-300 transition-colors"
+                    >
+                      <XCircle className="w-3.5 h-3.5" /> Reject
+                    </button>
+                  )}
+                  <button onClick={() => handleAddToTalentPool(app)} className="px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-violet-200 transition-colors">
+                    <UserPlus className="w-3.5 h-3.5" /> Talent Pool
+                  </button>
+                </div>
               </div>
             );
           })}

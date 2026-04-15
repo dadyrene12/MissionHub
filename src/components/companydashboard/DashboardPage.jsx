@@ -9,7 +9,8 @@ import {
   PieChart, PlusCircle, CalendarPlus,
   TrendingUp, Clock, ArrowRight, ArrowUpRight,
   CheckCircle, XCircle, AlertCircle, Inbox,
-  UserCheck, Sparkles, Building2, FileText
+  UserCheck, Sparkles, Building2, FileText,
+  Brain, Wand2, Target, Crown, TrendingDown
 } from 'lucide-react';
 import { apiFetch } from './CompanyDashboardUtils';
 
@@ -29,6 +30,9 @@ export default function DashboardPage({ user, showToast, isPremium, onNavigate }
   const [recentApplications, setRecentApplications] = useState([]);
   const [recentInterviews, setRecentInterviews] = useState([]);
   const [chartData, setChartData] = useState({ months: [], jobs: [], applications: [] });
+  const [aiInsights, setAiInsights] = useState(null);
+  const [topCandidates, setTopCandidates] = useState([]);
+  const [loadingInsights, setLoadingInsights] = useState(false);
 
   const fetchDashboardData = async (showLoader = true) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -37,10 +41,11 @@ export default function DashboardPage({ user, showToast, isPremium, onNavigate }
     if (showLoader) setLoading(true);
     
     try {
-      const [jobsRes, appsRes, intRes] = await Promise.all([
+      const [jobsRes, appsRes, intRes, aiStatsRes] = await Promise.all([
         apiFetch('/jobs/company'),
         apiFetch('/applications/for-my-jobs'),
-        apiFetch('/interview/company')
+        apiFetch('/interview/company'),
+        fetchAIInsights()
       ]);
 
       const jobs = jobsRes.ok ? (jobsRes.data?.data || []) : [];
@@ -101,9 +106,32 @@ export default function DashboardPage({ user, showToast, isPremium, onNavigate }
     }
   };
 
+  const fetchAIInsights = async () => {
+    setLoadingInsights(true);
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const res = await fetch(`${import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com/api'}/ai-matching/screening/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      
+      if (data.success && data.stats) {
+        setAiInsights(data.stats);
+        setTopCandidates(data.stats.topCandidates || []);
+      }
+    } catch (error) {
+      console.error('AI Insights error:', error);
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (token) fetchDashboardData();
+    if (token) {
+      fetchDashboardData();
+      fetchAIInsights();
+    }
     else setLoading(false);
   }, []);
 
@@ -274,6 +302,120 @@ export default function DashboardPage({ user, showToast, isPremium, onNavigate }
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-slate-950 rounded-xl text-sm font-bold hover:bg-slate-100 transition-colors"
             >
               View Schedule <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* AI Insights Section */}
+      {(aiInsights?.totalScreened > 0 || topCandidates.length > 0) && (
+        <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 rounded-2xl p-6 text-white shadow-xl">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <Brain className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">AI Screening Insights</h3>
+                <p className="text-purple-200 text-sm">{aiInsights?.totalScreened || 0} candidates analyzed</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => onNavigate?.('ai-screening')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-medium transition-colors backdrop-blur-sm"
+            >
+              <Wand2 className="w-4 h-4" />
+              Full Analysis
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
+              <p className="text-2xl font-bold">{aiInsights?.averageScore || 0}%</p>
+              <p className="text-purple-200 text-xs">Avg. Match Score</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
+              <p className="text-2xl font-bold text-emerald-300">{aiInsights?.scoreDistribution?.excellent || 0}</p>
+              <p className="text-purple-200 text-xs">Excellent (85+)</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
+              <p className="text-2xl font-bold text-blue-300">{aiInsights?.scoreDistribution?.good || 0}</p>
+              <p className="text-purple-200 text-xs">Strong (70-84)</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
+              <p className="text-2xl font-bold text-amber-300">{aiInsights?.scoreDistribution?.fair || 0}</p>
+              <p className="text-purple-200 text-xs">Fair (50-69)</p>
+            </div>
+          </div>
+
+          {topCandidates.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Crown className="w-5 h-5 text-amber-300" />
+                <h4 className="font-semibold">Top Recommended Candidates</h4>
+              </div>
+              <div className="grid md:grid-cols-3 gap-3">
+                {topCandidates.slice(0, 3).map((candidate, idx) => (
+                  <div 
+                    key={idx}
+                    className="bg-white/10 backdrop-blur-sm rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:bg-white/20 transition-colors"
+                    onClick={() => onNavigate?.('applicants')}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
+                      idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-slate-400' : 'bg-amber-700'
+                    }`}>
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{candidate.candidateName}</p>
+                      <p className="text-purple-200 text-xs flex items-center gap-1">
+                        <Target className="w-3 h-3" />
+                        {candidate.score}% match
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {stats.pendingApplications > 0 && (
+            <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-300" />
+                <span className="text-sm">
+                  <strong>{stats.pendingApplications}</strong> candidates awaiting review
+                </span>
+              </div>
+              <button 
+                onClick={() => onNavigate?.('ai-screening')}
+                className="text-sm font-medium text-white/80 hover:text-white flex items-center gap-1"
+              >
+                Screen with AI <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {(!aiInsights || aiInsights.totalScreened === 0) && stats.totalApplications > 0 && (
+        <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-2xl p-6 border border-violet-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-violet-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-950">AI Screening Available</h3>
+                <p className="text-slate-600 text-sm">Screen your {stats.totalApplications} candidates with AI</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => onNavigate?.('ai-screening')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-medium transition-colors"
+            >
+              <Wand2 className="w-4 h-4" />
+              Start AI Screening
             </button>
           </div>
         </div>

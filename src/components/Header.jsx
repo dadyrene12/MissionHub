@@ -30,37 +30,28 @@ const Header = ({
   inboxPanelOpen = false,
   handlePostJobClick,
 }) => {
-  
-  // ✅ FIXED: Determine if user is a company based on userType with safe access
   const isCompanyUser = user?.userType === 'company';
   
-  // ✅ FIXED: Handle post job click with proper backend user checks
   const handlePostJob = () => {
     if (!user) {
       showNotification('Please log in to post a job', 'warning');
       setLoginOpen(true);
       return;
     }
-    
-    // Check if user is verified
     if (!user.isVerified) {
       showNotification('Please verify your email before posting jobs', 'warning');
       return;
     }
-    
     if (user.userType !== 'company') {
-      showNotification('Only company accounts can post jobs. Please switch to a company account.', 'warning');
+      showNotification('Only company accounts can post jobs', 'warning');
       return;
     }
-    
     setPostJobOpen(true);
   };
 
-  // ✅ FIXED: Filter unread notifications and messages with safe access
   const unreadNotifications = Array.isArray(notifications) ? notifications.filter(n => n && !n.read) : [];
   const unreadMessages = Array.isArray(messages) ? messages.filter(m => m && !m.read) : [];
 
-  // ✅ FIXED: Get user initial for avatar with safe access
   const getUserInitial = () => {
     if (!user) return 'U';
     if (user.name && typeof user.name === 'string') return user.name.charAt(0).toUpperCase();
@@ -68,13 +59,11 @@ const Header = ({
     return 'U';
   };
 
-  // ✅ FIXED: Get user profile picture
   const getUserProfilePicture = () => {
     if (!user) return null;
     return user.profilePhoto || user.profilePicture || user.avatar || null;
   };
 
-  // ✅ FIXED: Get user display name with safe access
   const getUserDisplayName = () => {
     if (!user) return 'Guest';
     if (user.name && typeof user.name === 'string') return user.name;
@@ -82,7 +71,6 @@ const Header = ({
     return 'User';
   };
 
-  // ✅ FIXED: Get user role display text with safe access
   const getUserRoleDisplay = () => {
     if (!user) return 'guest';
     if (user.userType === 'company') return 'company';
@@ -90,23 +78,14 @@ const Header = ({
     return 'user';
   };
 
-  // ✅ FIXED: Get verification status
-  const getVerificationStatus = () => {
-    if (!user) return 'unverified';
-    return user.isVerified ? 'verified' : 'unverified';
-  };
-
-  // ✅ FIXED: Handle navigation with error boundary
   const safeHandleNavigation = (page) => {
     try {
       handleNavigation(page);
     } catch (error) {
-      console.error('Navigation error:', error);
       showNotification('Navigation error occurred', 'error');
     }
   };
 
-  // ✅ FIXED: Safe notification toggle with backend integration
   const safeToggleNotificationPanel = () => {
     if (user) {
       if (!user.isVerified) {
@@ -120,7 +99,6 @@ const Header = ({
     }
   };
 
-  // ✅ FIXED: Safe inbox toggle with backend integration
   const safeToggleInboxPanel = () => {
     if (user) {
       if (!user.isVerified) {
@@ -134,7 +112,6 @@ const Header = ({
     }
   };
 
-  // ✅ FIXED: Handle profile dropdown with backend checks
   const handleProfileDropdownToggle = () => {
     if (user && !user.isVerified) {
       showNotification('Please verify your email to access profile features', 'warning');
@@ -143,7 +120,6 @@ const Header = ({
     setProfileDropdownOpen(!profileDropdownOpen);
   };
 
-  // ✅ FIXED: Handle profile panel with backend checks
   const handleProfilePanelOpen = () => {
     if (user && !user.isVerified) {
       showNotification('Please verify your email to access profile features', 'warning');
@@ -153,7 +129,6 @@ const Header = ({
     setProfileDropdownOpen(false);
   };
 
-  // ✅ FIXED: Handle documents panel with backend checks
   const handleDocumentsPanelOpen = () => {
     if (user && !user.isVerified) {
       showNotification('Please verify your email to access documents', 'warning');
@@ -163,7 +138,6 @@ const Header = ({
     setProfileDropdownOpen(false);
   };
 
-  // ✅ FIXED: Handle settings panel with backend checks
   const handleSettingsPanelOpen = () => {
     if (user && !user.isVerified) {
       showNotification('Please verify your email to access settings', 'warning');
@@ -173,44 +147,24 @@ const Header = ({
     setProfileDropdownOpen(false);
   };
 
-  // ✅ FIXED: Navigation items based on user type and verification
   const getNavigationItems = () => {
     if (!user || !user.isVerified) {
-      // Basic navigation for unverified or logged out users
       return ['home', 'jobs', 'about'];
     }
-
     if (isCompanyUser) {
-      // Company user navigation
       return ['home', 'postJob'];
     } else {
-      // Job seeker navigation
-      return ['home', 'jobs', 'bookmarks', 'comparison', 'about'];
+      return ['home', 'jobs', 'bookmarks', 'about'];
     }
   };
 
   const navigationItems = getNavigationItems();
 
-  // ✅ FIXED: Get icon for navigation item
-  const getNavigationIcon = (page) => {
-    const icons = {
-      'home': <Home className="w-4 h-4 mr-1" />,
-      'jobs': <Briefcase className="w-4 h-4 mr-1" />,
-      'bookmarks': <BookmarkCheck className="w-4 h-4 mr-1" />,
-      'comparison': <BarChart3 className="w-4 h-4 mr-1" />,
-      'postJob': <FilePlus className="w-4 h-4 mr-1" />,
-      'about': <Users className="w-4 h-4 mr-1" />,
-    };
-    return icons[page] || <Home className="w-4 h-4 mr-1" />;
-  };
-
-  // ✅ FIXED: Get display name for navigation item
   const getNavigationDisplayName = (page) => {
     const names = {
       'home': 'Home',
       'jobs': 'Jobs',
       'bookmarks': 'Bookmarks',
-      'comparison': 'Compare',
       'postJob': 'Post Job',
       'about': 'About',
     };
@@ -218,83 +172,75 @@ const Header = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-gray-100">
-      {/* Scroll Progress Bar */}
+    <header className="sticky top-0 z-40 bg-white shadow-md border-b border-slate-200">
       <div 
-        className="fixed top-0 left-0 h-1 bg-gray-900 z-50 transition-all duration-100 ease-out" 
+        className="fixed top-0 left-0 h-1 bg-slate-600 z-50 transition-all duration-100 ease-out" 
         style={{ width: `${scrollProgress * 100}%` }}
-      ></div>
+      />
       
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
         <div className="flex justify-between items-center py-3 sm:py-4">
-          {/* Logo and Mobile Menu Button */}
           <div className="flex items-center space-x-2 sm:space-x-4">
-            {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="md:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
               aria-label="Toggle mobile menu"
             >
               {mobileMenuOpen ? (
-                <X className="w-5 h-5 text-gray-700" />
+                <X className="w-5 h-5 text-slate-700" />
               ) : (
-                <Menu className="w-5 h-5 text-gray-700" />
+                <Menu className="w-5 h-5 text-slate-700" />
               )}
             </button>
 
-            {/* Logo */}
             <button 
               onClick={() => safeHandleNavigation('home')}
-              className="flex items-center space-x-1 sm:space-x-2 text-xl sm:text-2xl font-bold text-gray-900 hover:text-gray-700 transition-colors"
+              className="flex items-center space-x-2 text-xl sm:text-2xl font-bold text-slate-900 hover:text-slate-600 transition-colors"
             >
-              <Briefcase className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
-              <span className="hidden xs:inline">Mission Hub</span>
-              <span className="xs:hidden">MH</span>
+              <Briefcase className="w-7 h-7 sm:w-8 sm:h-8 text-slate-600" />
+              <span>MissionHub</span>
             </button>
           </div>
 
-          {/* Desktop Navigation - Conditionally show based on user type */}
-          <nav className="hidden md:flex space-x-6 lg:space-x-8">
+          <nav className="hidden md:flex items-center space-x-1">
             {navigationItems.map(page => (
               <button
                 key={page}
                 onClick={() => {
                   if (page === 'postJob') {
                     handlePostJob();
+                  } else if (page === 'profile') {
+                    handleProfilePanelOpen();
                   } else {
                     safeHandleNavigation(page);
                   }
                 }}
-                className={`text-sm font-medium transition-colors duration-200 flex items-center ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   currentPage === page 
-                    ? 'text-gray-900 border-b-2 border-gray-900' 
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-slate-600 text-white' 
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
-                {getNavigationIcon(page)}
                 {getNavigationDisplayName(page)}
               </button>
             ))}
             
-            {/* Company Badge for verified company users */}
             {user?.isVerified && isCompanyUser && (
               <button
                 onClick={() => safeHandleNavigation('company-dashboard')}
-                className="hidden lg:flex items-center space-x-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-200"
+                className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-full text-sm font-medium hover:bg-green-700 transition-all"
               >
                 <Building className="w-4 h-4" />
-                <span>Company Dashboard</span>
+                <span>Dashboard</span>
               </button>
             )}
           </nav>
 
-          {/* User/Actions Section */}
-          <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-4">
-            {/* Post Job Button - Show for verified company users */}
+          <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
             {user?.isVerified && isCompanyUser && (
               <button 
                 onClick={handlePostJob}
-                className="hidden xs:flex items-center px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-900 text-white rounded-full text-xs sm:text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm whitespace-nowrap"
+                className="hidden xs:flex items-center px-4 py-2 bg-slate-600 text-white rounded-full text-xs sm:text-sm font-semibold hover:bg-slate-700 transition-all"
               >
                 <FilePlus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Post New Job</span>
@@ -302,14 +248,13 @@ const Header = ({
               </button>
             )}
             
-            {/* Post Job Button for non-company users (prompts registration) */}
             {!user && (
               <button 
                 onClick={() => {
                   showNotification('Please register as a company to post jobs', 'info');
                   setRegisterOpen(true);
                 }}
-                className="hidden xs:flex items-center px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-200 text-gray-700 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-300 transition-colors shadow-sm whitespace-nowrap"
+                className="hidden xs:flex items-center px-4 py-2 bg-slate-200 text-slate-700 rounded-full text-xs sm:text-sm font-medium hover:bg-slate-300 transition-all"
               >
                 <FilePlus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Post a Job</span>
@@ -317,162 +262,140 @@ const Header = ({
               </button>
             )}
             
-            {/* Action Buttons Container */}
-            <div className="flex items-center space-x-1 sm:space-x-2">
-              {/* Notifications */}
+            <div className="flex items-center border border-slate-200 rounded-full p-1">
               <button 
                 onClick={safeToggleNotificationPanel}
-                className="relative p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors group"
+                className="relative p-2 rounded-full hover:bg-slate-100 transition-all"
                 title="Notifications"
                 aria-label="Notifications"
                 disabled={user && !user.isVerified}
               >
-                <Bell className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
+                <Bell className={`w-5 h-5 transition-colors ${
                   user && !user.isVerified 
-                    ? 'text-gray-300' 
-                    : 'text-gray-600 group-hover:text-gray-900'
+                    ? 'text-slate-300' 
+                    : 'text-slate-600'
                 }`} />
                 {user && user.isVerified && unreadNotifications.length > 0 && (
-                  <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-2 h-2 sm:w-3 sm:h-3 bg-red-500 rounded-full animate-pulse border border-white"></span>
-                )}
-                {user && !user.isVerified && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border border-white"></span>
+                  <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border-2 border-white" />
                 )}
               </button>
               
-              {/* Inbox */}
               <button 
                 onClick={safeToggleInboxPanel}
-                className="relative p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors group"
+                className="relative p-2 rounded-full hover:bg-slate-100 transition-all"
                 title="Messages"
                 aria-label="Messages"
                 disabled={user && !user.isVerified}
               >
-                <Inbox className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
+                <Inbox className={`w-5 h-5 transition-colors ${
                   user && !user.isVerified 
-                    ? 'text-gray-300' 
-                    : 'text-gray-600 group-hover:text-gray-900'
+                    ? 'text-slate-300' 
+                    : 'text-slate-600'
                 }`} />
                 {user && user.isVerified && unreadMessages.length > 0 && (
-                  <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-2 h-2 sm:w-3 sm:h-3 bg-red-500 rounded-full animate-pulse border border-white"></span>
-                )}
-                {user && !user.isVerified && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border border-white"></span>
+                  <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border-2 border-white" />
                 )}
               </button>
+
+              {user && user.isVerified && (
+                <button 
+                  onClick={handleProfilePanelOpen}
+                  className="relative p-2 rounded-full hover:bg-slate-100 transition-all"
+                  title="Profile"
+                  aria-label="Profile"
+                >
+                  <UserCircle className="w-5 h-5 text-slate-600" />
+                </button>
+              )}
             </div>
             
-            {/* User Profile / Auth */}
             {user ? (
               <div className="relative">
                 <button
                   onClick={handleProfileDropdownToggle}
-                  className="flex items-center space-x-1 sm:space-x-2 p-1 rounded-lg hover:bg-gray-100 transition-colors group"
+                  className="flex items-center space-x-2 p-1.5 rounded-full hover:bg-white/10 transition-colors"
                   aria-label="User menu"
                   aria-expanded={profileDropdownOpen}
                   disabled={!user.isVerified}
                 >
-                  {getUserProfilePicture() ? (
-                    <img 
-                      src={getUserProfilePicture()} 
-                      alt="Profile" 
-                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-gray-200"
-                    />
-                  ) : (
-                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm shadow-sm ${
+                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-bold text-sm shadow-md ${
                       user.isVerified 
-                        ? 'bg-gray-900 text-white' 
-                        : 'bg-gray-400 text-white'
+                        ? 'bg-gradient-to-br from-slate-500 to-purple-600 text-white' 
+                        : 'bg-slate-600 text-white'
                     }`}>
                       {getUserInitial()}
                     </div>
-                  )}
-                  {!user.isVerified && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></span>
-                  )}
                   <div className="hidden lg:flex flex-col items-start">
-                    <span className={`text-sm font-medium group-hover:text-gray-900 ${
-                      user.isVerified ? 'text-gray-700' : 'text-gray-500'
+                    <span className={`text-sm font-medium ${
+                      user.isVerified ? 'text-white' : 'text-slate-400'
                     }`}>
                       {getUserDisplayName()}
-                      {!user.isVerified && ' (Unverified)'}
                     </span>
-                    <span className="text-xs text-gray-500 capitalize">
+                    <span className="text-xs text-slate-400 capitalize">
                       {getUserRoleDisplay()}
                     </span>
                   </div>
-                  <ChevronDown className={`hidden sm:block w-4 h-4 transition-transform ${
-                    user.isVerified ? 'text-gray-500' : 'text-gray-300'
-                  } ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`hidden sm:block w-4 h-4 text-slate-400 transition-transform ${
+                    profileDropdownOpen ? 'rotate-180' : ''
+                  }`} />
                 </button>
                 
-                {/* Profile Dropdown Menu */}
                 {profileDropdownOpen && user.isVerified && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-200">
-                    {/* User Info */}
-                    <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-sm font-semibold text-gray-900">{getUserDisplayName()}</p>
-                      <p className="text-xs text-gray-500 truncate">{user.email || 'No email'}</p>
-                      <div className="flex items-center mt-1 space-x-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl py-2 z-50 border border-slate-100 overflow-hidden">
+                    <div className="px-5 py-4 bg-gradient-to-r from-slate-50 to-slate-50 border-b border-slate-100">
+                      <p className="text-sm font-bold text-slate-900">{getUserDisplayName()}</p>
+                      <p className="text-xs text-slate-500 truncate">{user.email || 'No email'}</p>
+                      <div className="flex items-center mt-2 space-x-2">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                           isCompanyUser 
-                            ? 'bg-gray-100 text-gray-800' 
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-slate-100 text-slate-700' 
+                            : 'bg-purple-100 text-purple-700'
                         }`}>
-                          {isCompanyUser ? 'Company Account' : 'Job Seeker'}
+                          {isCompanyUser ? 'Company' : 'Job Seeker'}
                         </span>
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                           Verified
                         </span>
                       </div>
                     </div>
                     
-                    {/* Menu Items */}
-                    <div className="py-1">
+                    <div className="py-2">
                       <button
                         onClick={handleProfilePanelOpen}
-                        className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        className="w-full text-left flex items-center px-5 py-2.5 text-sm text-slate-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-purple-50 transition-colors"
                       >
-                        <UserCircle className="w-4 h-4 mr-3" />
+                        <UserCircle className="w-4 h-4 mr-3 text-slate-600" />
                         My Profile
                       </button>
                       
-                      <button
-                        onClick={handleDocumentsPanelOpen}
-                        className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        <FileText className="w-4 h-4 mr-3" />
-                        My Documents
-                      </button>
+                     
                       
                       <button
                         onClick={handleSettingsPanelOpen}
-                        className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        className="w-full text-left flex items-center px-5 py-2.5 text-sm text-slate-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-purple-50 transition-colors"
                       >
-                        <Settings className="w-4 h-4 mr-3" />
+                        <Settings className="w-4 h-4 mr-3 text-slate-600" />
                         Settings
                       </button>
                       
-                      {/* Company-specific options */}
                       {isCompanyUser && (
                         <button
                           onClick={() => {
                             setPostJobOpen(true);
                             setProfileDropdownOpen(false);
                           }}
-                          className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          className="w-full text-left flex items-center px-5 py-2.5 text-sm text-slate-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-purple-50 transition-colors"
                         >
-                          <FilePlus className="w-4 h-4 mr-3" />
+                          <FilePlus className="w-4 h-4 mr-3 text-green-600" />
                           Post New Job
                         </button>
                       )}
                     </div>
                     
-                    {/* Logout */}
-                    <div className="border-t border-gray-100 pt-1">
+                    <div className="border-t border-slate-100 pt-2">
                       <button
                         onClick={handleLogout}
-                        className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        className="w-full text-left flex items-center px-5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                       >
                         <LogOut className="w-4 h-4 mr-3" />
                         Sign Out
@@ -480,49 +403,18 @@ const Header = ({
                     </div>
                   </div>
                 )}
-
-                {/* Unverified User Dropdown */}
-                {profileDropdownOpen && !user.isVerified && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-200">
-                    <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-sm font-semibold text-gray-900">{getUserDisplayName()}</p>
-                      <p className="text-xs text-gray-500">Email verification required</p>
-                      <div className="flex items-center mt-2">
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          Unverified Account
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-3">
-                      <p className="text-xs text-gray-600 mb-2">
-                        Please check your email and verify your account to access all features.
-                      </p>
-                      <button
-                        onClick={() => {
-                          showNotification('Please check your email for the verification link', 'info');
-                          setProfileDropdownOpen(false);
-                        }}
-                        className="w-full text-center px-3 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
-                      >
-                        <Mail className="w-4 h-4 inline mr-2" />
-                        Resend Verification
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             ) : (
-              // Auth Buttons for non-logged in users
-              <div className="flex items-center space-x-2 sm:space-x-3">
+              <div className="flex items-center space-x-2">
                 <button 
                   onClick={() => setLoginOpen(true)}
-                  className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors shadow-sm whitespace-nowrap"
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-700 border border-slate-300 rounded-full hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap"
                 >
                   Login
                 </button>
                 <button 
                   onClick={() => setRegisterOpen(true)}
-                  className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors shadow-sm whitespace-nowrap"
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors shadow-sm whitespace-nowrap"
                 >
                   Register
                 </button>
@@ -532,106 +424,87 @@ const Header = ({
         </div>
       </div>
 
-      {/* Mobile Navigation Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-200 shadow-lg">
+        <div className="md:hidden bg-white border-t border-slate-200 shadow-lg">
           <div className="px-4 py-3 space-y-1">
-            {/* Mobile Navigation Links */}
             {navigationItems.map(page => (
               <button
                 key={page}
                 onClick={() => {
-                  safeHandleNavigation(page);
+                  if (page === 'postJob') {
+                    handlePostJob();
+                  } else if (page === 'profile') {
+                    handleProfilePanelOpen();
+                  } else {
+                    safeHandleNavigation(page);
+                  }
                   setMobileMenuOpen(false);
                 }}
-                className={`w-full text-left flex items-center px-4 py-3 rounded-lg text-base font-medium transition-colors ${
+                className={`w-full text-left flex items-center px-4 py-3 rounded-xl text-base font-medium transition-colors ${
                   currentPage === page 
-                    ? 'bg-gray-50 text-gray-900 border-l-4 border-gray-900' 
-                    : 'text-gray-600 hover:bg-gray-50'
+                    ? 'bg-slate-600 text-white' 
+                    : 'text-slate-700 hover:bg-slate-100'
                 }`}
               >
-                {getNavigationIcon(page)}
                 {getNavigationDisplayName(page)}
               </button>
             ))}
             
-            {/* Company Badge for mobile */}
             {user?.isVerified && isCompanyUser && (
-              <div className="flex items-center px-4 py-2 text-sm text-gray-700 bg-gray-50 rounded-lg">
-                <Building className="w-4 h-4 mr-2" />
-                Company Dashboard
-              </div>
+              <button
+                onClick={() => {
+                  safeHandleNavigation('company-dashboard');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left flex items-center px-4 py-3 rounded-xl text-base font-medium text-green-700 hover:bg-green-50"
+              >
+                <Building className="w-5 h-5 mr-3" />
+                Dashboard
+              </button>
             )}
 
-           
-           
-
-            {/* Mobile User Actions for logged in users */}
-            {user && (
-              <div className="border-t border-gray-200 pt-3 mt-3">
-                {/* Verification Notice */}
-                {!user.isVerified && (
-                  <div className="px-4 py-3 mb-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm font-medium text-yellow-800">Account Not Verified</p>
-                    <p className="text-xs text-yellow-600 mt-1">
-                      Please check your email to verify your account and access all features.
-                    </p>
-                  </div>
-                )}
-
+            {user ? (
+              <div className="border-t border-slate-200 pt-3 mt-3">
                 <button
                   onClick={() => {
-                    if (user.isVerified) {
-                      setProfilePanelOpen(true);
-                      setMobileMenuOpen(false);
-                    } else {
-                      showNotification('Please verify your email to access profile features', 'warning');
-                    }
+                    handleProfilePanelOpen();
+                    setMobileMenuOpen(false);
                   }}
-                  className={`w-full text-left flex items-center px-4 py-3 rounded-lg text-base font-medium transition-colors ${
-                    user.isVerified 
-                      ? 'text-gray-600 hover:bg-gray-50' 
-                      : 'text-gray-400'
-                  }`}
-                  disabled={!user.isVerified}
+                  className="w-full text-left flex items-center px-4 py-3 rounded-xl text-base font-medium text-slate-700 hover:bg-slate-100"
                 >
                   <UserCircle className="w-5 h-5 mr-3" />
                   My Profile
-                  {!user.isVerified && <span className="ml-2 text-xs text-yellow-600">(Verify Required)</span>}
                 </button>
-
-                
-
-                <button
-                  onClick={() => {
-                    if (user.isVerified) {
-                      setSettingsPanelOpen(true);
-                      setMobileMenuOpen(false);
-                    } else {
-                      showNotification('Please verify your email to access settings', 'warning');
-                    }
-                  }}
-                  className={`w-full text-left flex items-center px-4 py-3 rounded-lg text-base font-medium transition-colors ${
-                    user.isVerified 
-                      ? 'text-gray-600 hover:bg-gray-50' 
-                      : 'text-gray-400'
-                  }`}
-                  disabled={!user.isVerified}
-                >
-                  <Settings className="w-5 h-5 mr-3" />
-                  Settings
-                  {!user.isVerified && <span className="ml-2 text-xs text-yellow-600">(Verify Required)</span>}
-                </button>
-
                 <button
                   onClick={() => {
                     handleLogout();
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full text-left flex items-center px-4 py-3 rounded-lg text-base font-medium text-red-600 hover:bg-red-50 transition-colors"
+                  className="w-full text-left flex items-center px-4 py-3 rounded-xl text-base font-medium text-red-600 hover:bg-red-50"
                 >
                   <LogOut className="w-5 h-5 mr-3" />
                   Sign Out
+                </button>
+              </div>
+            ) : (
+              <div className="border-t border-slate-200 pt-3 mt-3 space-y-2">
+                <button 
+                  onClick={() => {
+                    setLoginOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left flex items-center px-4 py-3 rounded-xl text-base font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  Login
+                </button>
+                <button 
+                  onClick={() => {
+                    setRegisterOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left flex items-center px-4 py-3 rounded-xl text-base font-medium bg-slate-900 text-white hover:bg-slate-800"
+                >
+                  Register
                 </button>
               </div>
             )}
