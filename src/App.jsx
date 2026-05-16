@@ -12,8 +12,8 @@ import { Modals } from './components/Modals';
 import MobileMenu from './components/MobileMenu';
 import ProfilePanel from './components/ProfilePanel';
 import NotificationInboxSettingsPanels from './components/NotificationInboxSettingsPanels';
-import Adverse from './components/adverse';
 import CompanyDashboard from './components/CompanyDashboard';
+import SharedJobPanel from './components/SharedJobPanel';
 
 // Icons
 import {
@@ -282,6 +282,7 @@ const App = () => {
   const [aiAssistantThinking, setAiAssistantThinking] = useState(false);
   const [jobAlertBannerOpen, setJobAlertBannerOpen] = useState(false);
   const [expandedJobId, setExpandedJobId] = useState(null);
+  const [sharedJob, setSharedJob] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [testimonials] = useState([
     {
@@ -313,6 +314,9 @@ const App = () => {
     }
   ]);
   const [profilePanelOpen, setProfilePanelOpen] = useState(false);
+  const [incompleteProfileOpen, setIncompleteProfileOpen] = useState(false);
+  const [incompleteProfileFields, setIncompleteProfileFields] = useState([]);
+  const [applyingJobId, setApplyingJobId] = useState(null);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [inboxPanelOpen, setInboxPanelOpen] = useState(false);
@@ -407,11 +411,7 @@ const App = () => {
     applicationUrl: ''
   });
 
-  const [userDocuments, setUserDocuments] = useState([
-    { id: 1, name: 'Resume.pdf', type: 'resume', size: '245 KB', uploadDate: '2023-05-15', shared: false },
-    { id: 2, name: 'Cover_Letter.pdf', type: 'cover-letter', size: '125 KB', uploadDate: '2023-05-18', shared: true },
-    { id: 3, name: 'Portfolio.pdf', type: 'portfolio', size: '3.2 MB', uploadDate: '2023-05-20', shared: false }
-  ]);
+  const [userDocuments, setUserDocuments] = useState([]);
 
   const [uploadedFile, setUploadedFile] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
@@ -707,6 +707,41 @@ const App = () => {
     }
   };
 
+  // Refresh all data
+  const refreshData = async () => {
+    try {
+      const jobsPromise = fetchJobsFromBackend();
+      const appsPromise = token ? fetchUserApplications(token) : Promise.resolve();
+      const notifsPromise = token ? fetchNotifications(token) : Promise.resolve();
+      const messagesPromise = token ? fetchMessages(token) : Promise.resolve();
+      const companyAppsPromise = (token && user?.userType === 'company') ? fetchCompanyApplications(token) : Promise.resolve();
+      const profilePromise = token ? fetch(`${getApiBaseUrl()}/users/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(res => res.json()).then(profileData => {
+        if (profileData.success && profileData.data) {
+          const userData = profileData.data.user || profileData.data;
+          setUserProfile(prev => ({
+            ...prev,
+            ...userData,
+            profile: userData.profile || profileData.data.profile || {}
+          }));
+          if (userData.profile?.profilePhoto) {
+            setUser(prev => prev ? { ...prev, profilePhoto: userData.profile.profilePhoto } : prev);
+          }
+        }
+      }).catch(console.error) : Promise.resolve();
+
+      const [backendJobsData] = await Promise.all([
+        jobsPromise, appsPromise, notifsPromise, messagesPromise, companyAppsPromise, profilePromise
+      ]);
+
+      setDisplayedJobs(backendJobsData || []);
+      showNotification('Data refreshed', 'success');
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+  };
+
   // Fetch initial data
   const fetchInitialData = async (userToken) => {
     try {
@@ -728,8 +763,8 @@ const App = () => {
       
       setDisplayedJobs(backendJobsData || []);
       
-      // Run job matching after data loads
-      if (userToken && user?.userType === 'jobSeeker') {
+      // Run job matching after data loads (only for admins)
+      if (userToken && (user?.userType === 'super_admin' || user?.role === 'admin')) {
         setTimeout(async () => {
           try {
             await fetch(`${getApiBaseUrl()}/ai-matching/analyze-jobs`, {
@@ -844,6 +879,52 @@ const App = () => {
     }
   }, [token]);
 
+  // Handle routing - support both normal and hash routing for SPA compatibility
+  const getCurrentPath = () => {
+    return window.location.hash.slice(1) || window.location.pathname;
+  };
+  
+  // Listen for hash changes
+  useEffect(() => {
+    const handleHashChange = () => {
+      // Force re-render when hash changes
+      setCurrentPage(getCurrentPath() === '/jobs' ? 'jobs' : getCurrentPath() === '/' ? 'home' : getCurrentPath().replace(/^\//, '') || 'home');
+    };
+    
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+  
+  // Handle all routes with hash fallback
+  useEffect(() => {
+    const path = getCurrentPath();
+    
+    // Handle shared job links first
+    const jobMatch = path.match(/^\/jobs\/([a-zA-Z0-9]+)$/);
+    if (jobMatch && jobMatch[1]) {
+      const sharedJobId = jobMatch[1];
+      const foundJob = backendJobs.find(j => j.id === sharedJobId || j._id === sharedJobId);
+      if (foundJob) {
+        setSharedJob(foundJob);
+        showNotification(`Viewing shared job: ${foundJob.title}`, 'info');
+      } else if (backendJobs.length > 0) {
+        fetch(`${getApiBaseUrl()}/jobs/${sharedJobId}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.job) {
+              setSharedJob(data.job);
+              showNotification(`Viewing shared job: ${data.job.title}`, 'info');
+            }
+          })
+          .catch(() => {});
+      }
+      return;
+    }
+    
+    // Clear shared job when navigating to other routes
+    if (setSharedJob) setSharedJob(null);
+  }, [backendJobs]);
+
   // Handle user typing to prevent loader
   const handleUserTyping = (field, value) => {
     setIsUserTyping(true);
@@ -873,6 +954,25 @@ const App = () => {
       return;
     }
 
+    // Check if profile is complete enough to apply
+    const up = userProfile;
+    const p = up?.profile || {};
+    const hasSkills = (up.skills && up.skills.length > 0) || (p.skills && p.skills.length > 0);
+    const hasResume = up.resume || up.resume?.url || up.resumeURL || p.resume || p.resume?.url || p.resumeURL;
+    const hasTitle = (up.title && up.title.trim()) || (p.title && p.title.trim());
+    
+    const missingFields = [];
+    if (!hasTitle) missingFields.push('Job Title');
+    if (!hasSkills) missingFields.push('Skills');
+    if (!hasResume) missingFields.push('Resume/CV');
+    
+    // If all required fields are present, skip the modal
+    if (missingFields.length > 0) {
+      setIncompleteProfileFields(missingFields);
+      setIncompleteProfileOpen(true);
+      return;
+    }
+
     const job = backendJobs.find(j => j.id === jobId);
     if (!job) {
       showNotification('Job not found.', 'error');
@@ -894,6 +994,8 @@ const App = () => {
         }
       }
 
+      setApplyingJobId(jobId);
+
       const response = await fetch(`${getApiBaseUrl()}/applications`, {
         method: 'POST',
         headers: {
@@ -903,7 +1005,7 @@ const App = () => {
         body: JSON.stringify({
           jobId,
           coverLetter: applicationData.coverLetter || '',
-          resume: userProfile.resume
+          resume: userProfile.resume || userProfile.resumeURL || null
         })
       });
       
@@ -927,6 +1029,8 @@ const App = () => {
     } catch (error) {
       console.error('Error submitting application:', error);
       showNotification(error.message || 'Network error. Please try again.', 'error');
+    } finally {
+      setApplyingJobId(null);
     }
   };
 
@@ -1159,16 +1263,18 @@ const App = () => {
           fetchUserJobs(data.token).catch(console.error);
           fetchUserApplications(data.token).catch(console.error);
           
-          // Auto-analyze jobs for matching after login
-          setTimeout(async () => {
-            try {
-              await fetch(`${getApiBaseUrl()}/ai-matching/analyze-jobs`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data.token}` },
-                body: JSON.stringify({ minMatchScore: 50 })
-              });
-            } catch (e) { console.error('Job matching error:', e); }
-          }, 3000);
+          // Auto-analyze jobs for matching after login (only for admins)
+          if (data.user?.userType === 'super_admin' || data.user?.role === 'admin') {
+            setTimeout(async () => {
+              try {
+                await fetch(`${getApiBaseUrl()}/ai-matching/analyze-jobs`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data.token}` },
+                  body: JSON.stringify({ minMatchScore: 50 })
+                });
+              } catch (e) { console.error('Job matching error:', e); }
+            }, 3000);
+          }
         }
         
         // Show welcome message (backend now creates notifications in database)
@@ -1960,9 +2066,9 @@ const App = () => {
     // Show company dashboard for company users only when we have both user and token
     if (user?.userType === 'company' && token) {
       console.log('✅ Rendering CompanyDashboard');
-      return (
-        <CompanyDashboard user={user} token={token} />
-      );
+       return (
+         <CompanyDashboard user={user} token={token} onLogout={handleLogout} />
+       );
     }
 
     // For non-company users (job seekers or guests), show regular pages
@@ -2132,6 +2238,7 @@ const App = () => {
                           contactCompany={contactCompany}
                           aiMatchScore={job.aiMatchScore}
                           isGoodMatch={job.isGoodMatch}
+                          isApplying={applyingJobId === job.id}
                           isExcellentMatch={job.isExcellentMatch}
                         />
                       ))
@@ -2240,6 +2347,7 @@ const App = () => {
                     aiMatchScore={job.aiMatchScore}
                     isGoodMatch={job.isGoodMatch}
                     isExcellentMatch={job.isExcellentMatch}
+                    isApplying={applyingJobId === job.id}
                   />
                 ))}
               </div>
@@ -2300,6 +2408,7 @@ const App = () => {
                     aiMatchScore={job.aiMatchScore}
                     isGoodMatch={job.isGoodMatch}
                     isExcellentMatch={job.isExcellentMatch}
+                    isApplying={applyingJobId === job.id}
                   />
                 ))}
               </div>
@@ -2367,14 +2476,15 @@ const App = () => {
               mobileMenuOpen={mobileMenuOpen}
               setMobileMenuOpen={setMobileMenuOpen}
               handlePostJobClick={handlePostJobClick}
+              onRefresh={refreshData}
             />
           )}
           
           <main className={user?.userType === 'company' ? "min-h-screen" : "min-h-[70vh]"}>
             {renderPage()}
-            
-            {/* Test Button */}
-            
+            {sharedJob && (
+              <SharedJobPanel job={sharedJob} onClose={() => setSharedJob(null)} applyForJob={applyForJob} user={user} setLoginOpen={setLoginOpen} />
+            )}
           </main>
           
           {/* Conditionally render Footer only for non-company users */}
@@ -2431,7 +2541,54 @@ const App = () => {
             jobs={backendJobs}
             showNotification={showNotification}
             token={token}
+            onRefresh={refreshData}
           />
+
+          {/* Incomplete Profile Modal */}
+          {incompleteProfileOpen && (
+            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">Complete Your Profile</h3>
+                  <p className="text-slate-500 mt-2">Please fill in the following to apply for jobs:</p>
+                </div>
+                
+                <div className="space-y-3 mb-6">
+                  {incompleteProfileFields.map((field, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                      <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-bold text-amber-600">{index + 1}</span>
+                      </div>
+                      <span className="font-medium text-slate-700">{field}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIncompleteProfileOpen(false)}
+                    className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIncompleteProfileOpen(false);
+                      setProfilePanelOpen(true);
+                    }}
+                    className="flex-1 px-4 py-3 bg-slate-900 text-white rounded-lg font-semibold hover:bg-slate-800"
+                  >
+                    Complete Profile
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <NotificationInboxSettingsPanels 
             notificationPanelOpen={notificationPanelOpen}
@@ -2458,6 +2615,7 @@ const App = () => {
             userId={user?._id || user?.id}
             token={token}
             userType={user?.userType || 'jobSeeker'}
+            onRefresh={refreshData}
           />
 
           {/* Company Applications Panel - only show for company users and if there are applications */}
@@ -2488,7 +2646,7 @@ const App = () => {
               key={notification.id}
               className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-xl z-50 text-white font-medium transition-all duration-500 ease-out animate-toastIn ${
                 notification.type === 'success' ? 'bg-green-600' :
-                notification.type === 'info' ? 'bg-blue-600' :
+                notification.type === 'info' ? 'bg-slate-700' :
                 notification.type === 'warning' ? 'bg-yellow-600' : 'bg-red-600'
               }`}
             >

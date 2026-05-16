@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   BarChart3, Trash2, X, CheckCircle, Brain, Target, 
   Award, AlertTriangle, ThumbsUp, Star, Zap, TrendingUp,
-  MessageSquare, Lightbulb, Clock, Users, MapPin
+  MessageSquare, Lightbulb, Clock, Users, Map
 } from 'lucide-react';
 
 // AI Analysis Component

@@ -5,7 +5,6 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(),tailwindcss()],
-
   server: {
      port: 5173,
      proxy: {
@@ -31,10 +30,16 @@ export default defineConfig({
          changeOrigin: true,
          secure: false
        }
-     },
-     optimizeDeps: {
-       include: ['lucide-react']
      }
-   }
+  },
+  preview: {
+    proxy: {
+      '^/jobs': {
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        rewrite: (path) => path
+      }
+    }
+  }
 })
  

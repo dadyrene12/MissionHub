@@ -1715,7 +1715,8 @@ const SettingsPanel = ({
   token,
   onLogout,
   onPasswordChange,
-  onDeleteAccount
+  onDeleteAccount,
+  onRefresh
 }) => {
   const [activeTab, setActiveTab] = useState('notifications');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -1725,6 +1726,11 @@ const SettingsPanel = ({
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  const handleSettingToggle = (key, value) => {
+    updateSettings(key, value);
+    if (onRefresh) onRefresh();
+  };
 
   const settingsSections = {
     notifications: [
@@ -1769,6 +1775,7 @@ const SettingsPanel = ({
         await onPasswordChange(passwordForm.currentPassword, passwordForm.newPassword);
         setShowPasswordModal(false);
         setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        if (onRefresh) onRefresh();
       }
     } catch (err) {
       setPasswordError(err.message || 'Failed to change password');
@@ -1929,7 +1936,7 @@ const SettingsPanel = ({
                       </div>
                     </div>
                     <button
-                      onClick={() => updateSettings(setting.key, !userSettings[setting.key])}
+                      onClick={() => handleSettingToggle(setting.key, !userSettings[setting.key])}
                       className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${
                         userSettings[setting.key] 
                           ? 'bg-slate-900' 
@@ -2129,7 +2136,8 @@ const NotificationInboxSettingsPanels = ({
   updateSettings = () => {},
   token,
   userId,
-  userType
+  userType,
+  onRefresh
 }) => {
   const [notifications, setNotifications] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -2237,7 +2245,7 @@ const NotificationInboxSettingsPanels = ({
     
     try {
       // Try the direct endpoint first
-      const response = await fetch(`/api/messages/conversation/${otherUserId}`, {
+      const response = await fetch(`/api/messages/${otherUserId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -2631,6 +2639,7 @@ const NotificationInboxSettingsPanels = ({
           onLogout={userSettings.onLogout}
           onPasswordChange={userSettings.onPasswordChange}
           onDeleteAccount={userSettings.onDeleteAccount}
+          onRefresh={onRefresh}
         />
       </ErrorBoundary>
     </>

@@ -3,6 +3,7 @@ import {
   Home, BookmarkCheck, BarChart3, Users, Menu, Bell, Inbox,
   FilePlus, UserCircle, FileText, Settings, LogOut, X,
   ChevronDown, Building, Briefcase, Mail, MessageSquare,
+  RefreshCw,
 } from 'lucide-react';
 
 const Header = ({
@@ -29,6 +30,7 @@ const Header = ({
   notificationPanelOpen = false,
   inboxPanelOpen = false,
   handlePostJobClick,
+  onRefresh,
 }) => {
   const isCompanyUser = user?.userType === 'company';
   
@@ -263,6 +265,16 @@ const Header = ({
             )}
             
             <div className="flex items-center border border-slate-200 rounded-full p-1">
+              {onRefresh && user && (
+                <button 
+                  onClick={onRefresh}
+                  className="p-2 rounded-full hover:bg-slate-100 transition-all"
+                  title="Refresh data"
+                  aria-label="Refresh"
+                >
+                  <RefreshCw className="w-5 h-5 text-slate-600" />
+                </button>
+              )}
               <button 
                 onClick={safeToggleNotificationPanel}
                 className="relative p-2 rounded-full hover:bg-slate-100 transition-all"

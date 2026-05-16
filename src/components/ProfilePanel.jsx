@@ -1,9 +1,9 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { X, Upload, FileText, Eye, User, MapPin, Briefcase, Globe, Trash2, Save, Loader2, Award, Phone, Code, Linkedin, Github, ExternalLink, CheckCircle, Clock, ChevronDown, Zap } from 'lucide-react';
+import { X, Upload, FileText, Eye, User, MapPin, Briefcase, Globe, Trash2, Save, Loader2, Award, Phone, Code, Linkedin, Github, ExternalLink, CheckCircle, Clock, ChevronDown, Zap, RefreshCw } from 'lucide-react';
 
 const API_BASE = import.meta.env.MODE === "development" ? "/api" : 'https://missionhubbackend.onrender.com/api';
 
-const ProfilePanel = ({ profilePanelOpen, setProfilePanelOpen, user, showNotification, token }) => {
+const ProfilePanel = ({ profilePanelOpen, setProfilePanelOpen, user, showNotification, token, onRefresh }) => {
   const [activeTab, setActiveTab] = useState('personal');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -63,10 +63,10 @@ const ProfilePanel = ({ profilePanelOpen, setProfilePanelOpen, user, showNotific
             github: userData.profile?.github || userData.profile?.githubUrl || '',
             portfolio: userData.profile?.portfolio || userData.profile?.websiteUrl || ''
           }));
-          const avatarUrl = userData.profile?.profilePhoto || userData.profile?.profilePicture || userData.avatar || userData.image || user?.image || null;
+          const avatarUrl = userData.profile?.profilePhoto || userData.profile?.profilePicture || userData.avatar || userData.image || userData.profilePhoto || user?.profilePhoto || user?.profile?.profilePhoto || null;
           setProfilePicture(avatarUrl);
-          if (userData.profile?.resume) {
-            setFormData(prev => ({ ...prev, resume: userData.profile.resume }));
+          if (userData.profile?.resume || userData.resume) {
+            setFormData(prev => ({ ...prev, resume: userData.profile?.resume || userData.resume }));
           }
         }
       }
@@ -166,8 +166,10 @@ const ProfilePanel = ({ profilePanelOpen, setProfilePanelOpen, user, showNotific
       const data = await res.json();
       if (data.success) {
         showNotification(data.message || 'Profile saved!', 'success');
+        if (onRefresh) onRefresh();
       } else {
         showNotification(data.message || 'Profile updated', data.success === false ? 'error' : 'success');
+        if (onRefresh) onRefresh();
       }
     } catch (error) {
       console.error('Save profile error:', error);
@@ -195,13 +197,16 @@ const ProfilePanel = ({ profilePanelOpen, setProfilePanelOpen, user, showNotific
       if (data.success) {
         setProfilePicture(data.photoUrl || data.url || data.profilePhoto);
         showNotification('Profile picture uploaded!', 'success');
+        if (onRefresh) onRefresh();
       } else {
         setProfilePicture(URL.createObjectURL(file));
         showNotification('Picture saved locally', 'success');
+        if (onRefresh) onRefresh();
       }
     } catch (err) {
       setProfilePicture(URL.createObjectURL(file));
       showNotification('Picture saved locally', 'success');
+      if (onRefresh) onRefresh();
     }
     setFileUploading(false);
   };
@@ -213,25 +218,34 @@ const ProfilePanel = ({ profilePanelOpen, setProfilePanelOpen, user, showNotific
     if (!currentToken) { showNotification('Please login', 'error'); return; }
     setFileUploading(true);
     try {
+      // Try Cloudflare R2 first
+      const R2_UPLOAD_URL = 'https://api.dblivpykh.workers.dev/upload';
+      const R2_ROOT = 'Root-985465718553282';
+      const R2_API_KEY = 'Z3kIqffAFzSCt-kid2-ihtt8rSI';
       const formDataUpload = new FormData();
-      formDataUpload.append('resume', file);
-      const res = await fetch(`${API_BASE}/upload/resume`, {
+      formDataUpload.append('file', file);
+      formDataUpload.append('folder', 'resumes');
+      formDataUpload.append('filename', file.name);
+      
+      const res = await fetch(R2_UPLOAD_URL, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${currentToken}` },
+        headers: { 
+          'Authorization': `Bearer ${currentToken}`,
+          'x-root': R2_ROOT,
+          'x-api-key': R2_API_KEY
+        },
         body: formDataUpload
       });
+      
       const data = await res.json();
-      if (data.success && data.data?.resume) {
-        setFormData(prev => ({ ...prev, resume: data.data.resume }));
-        showNotification('Resume uploaded!', 'success');
-      } else if (data.success && data.resume) {
-        setFormData(prev => ({ ...prev, resume: data.resume }));
-        showNotification('Resume uploaded!', 'success');
+      if (data.success && data.url) {
+        setFormData(prev => ({ ...prev, resume: { name: file.name, url: data.url } }));
+        showNotification('Resume uploaded to cloud!', 'success');
       } else {
-        setFormData(prev => ({ ...prev, resume: { name: file.name, url: URL.createObjectURL(file) } }));
-        showNotification('Resume saved locally', 'success');
+        throw new Error('Cloud upload failed');
       }
     } catch (err) {
+      // Fallback: save locally
       setFormData(prev => ({ ...prev, resume: { name: file.name, url: URL.createObjectURL(file) } }));
       showNotification('Resume saved locally', 'success');
     }
@@ -243,7 +257,9 @@ const ProfilePanel = ({ profilePanelOpen, setProfilePanelOpen, user, showNotific
   };
 
   const viewResume = () => {
-    if (formData.resume?.url) window.open(formData.resume.url, '_blank');
+    if (formData.resume?.url) {
+      window.open(formData.resume.url, '_blank');
+    }
   };
 
   const handleDeleteResume = () => {
@@ -280,17 +296,9 @@ const ProfilePanel = ({ profilePanelOpen, setProfilePanelOpen, user, showNotific
           <div className="bg-white p-4 md:p-6 border-b border-slate-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 md:gap-5">
-                <div className="relative">
-                  <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden cursor-pointer hover:bg-slate-200" onClick={() => profilePicInputRef.current?.click()}>
-                    {profilePicture ? <img src={profilePicture} alt="Profile" className="w-full h-full object-cover" /> : <span className="text-slate-600 font-bold text-lg md:text-xl">{user?.name ? user.name.charAt(0).toUpperCase() : 'U'}</span>}
-                  </div>
-                  <input type="file" ref={profilePicInputRef} onChange={handleProfilePictureUpload} accept="image/*" className="hidden" />
-                  <button type="button" onClick={() => profilePicInputRef.current?.click()} className="absolute bottom-0 right-0 bg-slate-800 text-white text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded md:block hidden">Change</button>
-                </div>
-                <div className="md:block hidden"><h2 className="text-lg md:text-xl font-bold">Profile Settings</h2><p className="text-slate-500 text-sm">Manage your personal information</p></div>
-                <div className="md:hidden block">
-                  <h2 className="text-lg font-bold">{activeTabData?.label}</h2>
-                  <p className="text-slate-500 text-xs">Profile Settings</p>
+                <div>
+                  <h2 className="text-lg md:text-xl font-bold">Profile Settings</h2>
+                  <p className="text-slate-500 text-sm">Manage your personal information</p>
                 </div>
               </div>
               <button onClick={() => setProfilePanelOpen(false)} className="p-2.5 hover:bg-slate-100 rounded-xl"><X className="w-5 h-5" /></button>
@@ -364,27 +372,44 @@ const ProfilePanel = ({ profilePanelOpen, setProfilePanelOpen, user, showNotific
                 {activeTab === 'documents' && (
                   <div className="space-y-6">
                     <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200">
-                      <div className="flex items-center gap-4 mb-4 md:mb-6"><FileText className="w-6 h-6 text-slate-600" /><div><h3 className="text-lg font-bold">Resume</h3><p className="text-sm text-slate-500">Your primary job application document</p></div></div>
+                      <div className="flex items-center gap-4 mb-4 md:mb-6"><FileText className="w-6 h-6 text-slate-600" /><div><h3 className="text-lg font-bold">Resume / CV</h3><p className="text-sm text-slate-500">Your primary job application document</p></div></div>
+                      
                       {formData.resume ? (
-                        <div className="bg-white rounded-xl p-4 md:p-5 border border-slate-200">
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 md:w-14 h-12 md:h-14 bg-slate-100 rounded-xl flex items-center justify-center"><FileText className="w-6 md:w-7 h-6 md:h-7 text-slate-600" /></div>
-                              <div><p className="font-bold text-slate-900 text-sm md:text-base">{formData.resume.name || 'Resume.pdf'}</p><p className="text-sm text-slate-500 flex items-center"><CheckCircle className="w-3.5 h-3.5 text-emerald-500 mr-1" />Uploaded</p></div>
+                        <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <FileText className="w-7 h-7 text-emerald-600" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-bold text-slate-900 truncate">{formData.resume?.name || formData.resume?.url?.split('/').pop() || 'Resume'}</p>
+                                <p className="text-sm text-emerald-600 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" />Uploaded successfully</p>
+                              </div>
                             </div>
-                            <div className="flex gap-2 w-full sm:w-auto">
-                              <button onClick={viewResume} className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold flex items-center justify-center"><Eye className="w-4 h-4 mr-1.5" />View</button>
-                              <button onClick={() => triggerFileInput('resume')} className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold">Replace</button>
-                              <button onClick={handleDeleteResume} className="p-2.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-5 h-5" /></button>
+                            <div className="flex gap-2 flex-shrink-0">
+                              <button onClick={viewResume} className="px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-slate-700">
+                                <Eye className="w-4 h-4" />View
+                              </button>
+                              <button onClick={() => triggerFileInput('resume')} className="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200">
+                                Replace
+                              </button>
+                              <button onClick={handleDeleteResume} className="p-2.5 text-red-500 hover:bg-red-50 rounded-lg" title="Delete resume">
+                                <Trash2 className="w-5 h-5" />
+                              </button>
                             </div>
                           </div>
                         </div>
                       ) : (
-                        <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 md:p-10 text-center hover:border-slate-400 cursor-pointer bg-white" onClick={() => triggerFileInput('resume')}>
-                          <div className="w-12 md:w-16 h-12 md:h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4"><Upload className="w-6 md:w-8 h-6 md:h-8 text-slate-500" /></div>
-                          <p className="text-slate-900 font-bold text-base md:text-lg mb-2">No Resume</p>
-                          <p className="text-slate-500 text-sm mb-5">Click to upload your resume</p>
-                          <div className="px-6 md:px-8 py-2.5 md:py-3 bg-slate-800 text-white rounded-xl font-semibold inline-block text-sm md:text-base">{fileUploading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading...</> : 'Choose File'}</div>
+                        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 md:p-12 text-center hover:border-slate-400 hover:bg-slate-50/50 cursor-pointer transition-all" onClick={() => triggerFileInput('resume')}>
+                          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Upload className="w-8 h-8 text-slate-400" />
+                          </div>
+                          <p className="text-slate-900 font-bold text-lg mb-1">No Resume</p>
+                          <p className="text-slate-500 text-sm mb-5">Upload your resume to apply for jobs faster</p>
+                          <div className="px-8 py-3 bg-slate-800 text-white rounded-xl font-semibold inline-flex items-center gap-2 text-sm">
+                            {fileUploading ? <><Loader2 className="w-4 h-4 animate-spin" />Uploading...</> : <><Upload className="w-4 h-4" />Choose File</>}
+                          </div>
+                          <p className="text-xs text-slate-400 mt-4">PDF, DOC, or DOCX (max 5MB)</p>
                         </div>
                       )}
                     </div>

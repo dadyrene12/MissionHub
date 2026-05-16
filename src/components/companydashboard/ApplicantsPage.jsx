@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Eye, CheckCircle, XCircle, Users, Mail, FileText,
-  Filter, Calendar, ThumbsUp, ThumbsDown, Star, Clock, Briefcase,
+  Calendar, ThumbsUp, ThumbsDown, Star, Clock, Briefcase,
   MapPin, DollarSign, GraduationCap, Phone, MessageCircle, Send,
   ChevronDown, ChevronUp, Loader2, CheckCheck, X, Download,
   User, RefreshCw, SlidersHorizontal, UserPlus, Heart, Award,
@@ -365,6 +365,8 @@ export const ApplicantsPage = ({ token, user, showToast, talentPool, setTalentPo
   };
 
   const findAIMatches = async (job) => {
+    if (!job || !job._id) return;
+    
     setLoadingMatches(true);
     setShowAIMatchModal(true);
     
@@ -419,7 +421,7 @@ export const ApplicantsPage = ({ token, user, showToast, talentPool, setTalentPo
         
         setAiMatches(matchedApps);
       } else {
-        showToast('AI screening not available, using local matching', 'info');
+        if (showToast) showToast('Using local matching', 'info');
         const normalizeText = (text) => String(text || '').toLowerCase().replace(/[^\w\s]/g, '');
         
         const calculateSkillMatch = (applicantSkills, jobSkills) => {
@@ -479,7 +481,7 @@ export const ApplicantsPage = ({ token, user, showToast, talentPool, setTalentPo
       }
     } catch (error) {
       console.error('AI Match Error:', error);
-      showToast('Error running AI analysis', 'error');
+      if (showToast) showToast('Error running AI analysis', 'error');
       setAiMatches([]);
     }
     
@@ -763,38 +765,32 @@ export const ApplicantsPage = ({ token, user, showToast, talentPool, setTalentPo
         </div>
       )}
 
-      {/* AI Match Modal */}
+{/* AI Match Modal */}
       {showAIMatchModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-3xl my-8 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="bg-white border-b border-slate-200 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-slate-950 rounded-2xl flex items-center justify-center">
-                    <Brain className="w-7 h-7 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold text-slate-950">AI Candidate Matching</h3>
-                    <p className="text-slate-500 text-sm">Find the best candidates based on skills, experience & CV</p>
-                  </div>
+            <div className="bg-slate-900 px-5 py-4 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center">
+                  <Brain className="w-5 h-5 text-white" />
                 </div>
-                <button onClick={() => setShowAIMatchModal(false)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-950 transition-all">
-                  <X className="w-6 h-6" />
-                </button>
+                <div>
+                  <h3 className="text-lg font-bold text-white">AI Candidate Matching</h3>
+                </div>
               </div>
+              <button onClick={() => setShowAIMatchModal(false)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {/* Select Job */}
-            <div className="p-5 border-b border-slate-200 bg-white">
-              <label className="block text-sm font-semibold text-slate-950 mb-2 flex items-center gap-2">
-                <Briefcase className="w-4 h-4" /> Select a job position to analyze
-              </label>
+            <div className="px-5 py-3 border-b border-slate-200 flex-shrink-0">
               <select 
-                className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400 transition-all"
+                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-400"
                 onChange={(e) => e.target.value && findAIMatches(jobs.find(j => j._id === e.target.value))}
               >
-                <option value="">Choose a job position...</option>
+                <option value="">Select a job position to analyze...</option>
                 {jobs.filter(j => j.status === 'active').map(job => (
                   <option key={job._id} value={job._id}>{job.title}</option>
                 ))}
@@ -802,211 +798,87 @@ export const ApplicantsPage = ({ token, user, showToast, talentPool, setTalentPo
             </div>
 
             {/* Results */}
-            <div className="p-5 max-h-[65vh] overflow-y-auto bg-white">
+            <div className="flex-1 overflow-y-auto p-5">
               {loadingMatches ? (
-                <div className="text-center py-16">
-                  <div className="relative w-24 h-24 mx-auto mb-6">
-                    <div className="absolute inset-0 border-4 border-slate-100 rounded-full" />
-                    <div className="absolute inset-0 border-4 border-transparent border-t-slate-950 rounded-full animate-spin" />
+                <div className="flex items-center justify-center py-16">
+                  <div className="relative w-16 h-16">
+                    <div className="absolute inset-0 border-3 border-slate-200 rounded-full" />
+                    <div className="absolute inset-0 border-3 border-transparent border-t-slate-900 rounded-full animate-spin" />
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Brain className="w-10 h-10 text-slate-950 animate-pulse" />
+                      <Brain className="w-6 h-6 text-slate-900" />
                     </div>
                   </div>
-                  <p className="text-slate-950 font-semibold text-lg">Analyzing Candidates...</p>
-                  <p className="text-slate-500 text-sm mt-1"> Comparing skills, experience & qualifications</p>
                 </div>
               ) : aiMatches.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Target className="w-10 h-10 text-slate-950" />
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Target className="w-8 h-8 text-slate-400" />
                   </div>
-                  <p className="text-slate-950 font-semibold">Select a job to analyze candidates</p>
-                  <p className="text-slate-500 text-sm mt-1">AI will match based on skills, experience & CV</p>
+                  <p className="text-slate-600 font-medium">Select a job to analyze candidates</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {/* Stats Header */}
-                  <div className="flex items-center justify-between bg-white rounded-xl p-4 border border-slate-200">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center">
-                        <Users className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-950">{aiMatches.length}</p>
-                        <p className="text-xs text-slate-500">Candidates Analyzed</p>
-                      </div>
+                <div className="space-y-3">
+                  {/* Stats */}
+                  <div className="flex items-center gap-4 text-sm mb-4">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-slate-400" />
+                      <span className="font-medium text-slate-600">{aiMatches.length} candidates</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 bg-slate-950 text-white text-xs font-semibold rounded-full">
-                        Powered by AI
-                      </span>
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full" />
+                      <span className="text-slate-600">{aiMatches.filter(a => Number(a.matchScore?.score) >= 70).length} good matches</span>
                     </div>
                   </div>
 
-                  {/* Candidate Cards */}
+                  {/* Candidates */}
                   {aiMatches.map((app, index) => {
                     const score = Number(app.matchScore?.score) || 0;
                     const isTopMatch = index === 0 && score >= 70;
                     
                     return (
-                      <div key={app._id} className={`relative bg-white rounded-2xl border transition-all hover:shadow-lg ${isTopMatch ? 'border-slate-950 ring-2 ring-slate-200' : 'border-slate-200'}`}>
-                        {/* Top Match Badge */}
-                        {isTopMatch && (
-                          <div className="absolute -top-3 left-4 px-3 py-1 bg-slate-950 text-white text-xs font-bold rounded-full shadow-lg">
-                            Top Match
-                          </div>
-                        )}
-                        
-                        <div className="p-5">
-                          {/* Header Row */}
-                          <div className="flex items-center gap-4 mb-4">
-                            {/* Avatar with Score Circle */}
-                            <div className="relative">
-                              <div className="w-14 h-14 bg-slate-950 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                                {getInitials(app.userId?.name)}
-                              </div>
-                              {/* Score Circle */}
-                              <div className={`absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg border-2 border-white ${
-                                score >= 80 ? 'bg-emerald-500' : score >= 60 ? 'bg-amber-500' : 'bg-slate-400'
-                              }`}>
-                                {score}%
-                              </div>
-                            </div>
-                            
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-bold text-slate-950 truncate">{app.userId?.name || 'Applicant'}</h4>
-                                {isTopMatch && <Sparkles className="w-4 h-4 text-slate-950" />}
-                              </div>
-                              <p className="text-sm text-slate-500 truncate">{app.jobId?.title || app.userId?.email}</p>
-                            </div>
-                            
-                            {/* Overall Score */}
-                            <div className="text-right">
-                              <div className={`text-3xl font-black ${
-                                score >= 80 ? 'text-emerald-600' : score >= 60 ? 'text-amber-600' : 'text-slate-600'
-                              }`}>
-                                {score}%
-                              </div>
-                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Match Score</p>
-                            </div>
+                      <div key={app._id} className={`p-4 rounded-xl border ${isTopMatch ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-white'}`}>
+                        <div className="flex items-center gap-3">
+                          {/* Avatar */}
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm ${score >= 80 ? 'bg-slate-900' : score >= 60 ? 'bg-slate-600' : 'bg-slate-400'}`}>
+                            {getInitials(app.userId?.name)}
                           </div>
                           
-                          {/* Progress Bar */}
-                          <div className="mb-4">
-                            <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-1000 ${
-                                  score >= 80 ? 'bg-emerald-500' : 
-                                  score >= 60 ? 'bg-amber-500' : 
-                                  'bg-slate-400'
-                                }`}
-                                style={{ width: `${score}%` }}
-                              />
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold text-slate-900 text-sm truncate">{app.userId?.name || 'Applicant'}</h4>
+                              {isTopMatch && <span className="px-1.5 py-0.5 bg-slate-900 text-white text-[10px] font-bold rounded">Top</span>}
                             </div>
+                            <p className="text-xs text-slate-500 truncate">{app.userId?.email}</p>
                           </div>
                           
-                          {/* Score Breakdown Grid */}
-                          <div className="grid grid-cols-4 gap-3 mb-4">
-                            {/* Skills */}
-                            <div className={`p-3 rounded-xl border ${(app.matchScore?.skillScore ?? 0) >= 70 ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                              <div className="flex items-center gap-2 mb-1">
-                                <Award className={`w-4 h-4 ${(app.matchScore?.skillScore ?? 0) >= 70 ? 'text-emerald-600' : 'text-slate-950'}`} />
-                                <span className="text-[10px] font-semibold text-slate-950 uppercase">Skills</span>
-                              </div>
-                              <p className={`text-xl font-bold ${(app.matchScore?.skillScore ?? 0) >= 70 ? 'text-emerald-600' : 'text-slate-950'}`}>
-                                {app.matchScore?.skillScore || 0}%
-                              </p>
-                              <p className="text-[10px] text-slate-500">
-                                {(app.matchScore?.matchedSkills?.length || 0)}/{((app.matchScore?.matchedSkills?.length || 0) + (app.matchScore?.missingSkills?.length || 0))} matched
-                              </p>
+                          {/* Score */}
+                          <div className="text-right">
+                            <div className={`text-xl font-black ${score >= 80 ? 'text-slate-900' : score >= 60 ? 'text-slate-600' : 'text-slate-400'}`}>
+                              {score}%
                             </div>
-                            
-                            {/* Experience */}
-                            <div className={`p-3 rounded-xl border ${(app.matchScore?.yearsExp ?? 0) >= (app.matchScore?.requiredExp ?? 0) ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                              <div className="flex items-center gap-2 mb-1">
-                                <Briefcase className={`w-4 h-4 ${(app.matchScore?.yearsExp ?? 0) >= (app.matchScore?.requiredExp ?? 0) ? 'text-emerald-600' : 'text-slate-950'}`} />
-                                <span className="text-[10px] font-semibold text-slate-950 uppercase">Experience</span>
-                              </div>
-                              <p className={`text-xl font-bold ${(app.matchScore?.yearsExp ?? 0) >= (app.matchScore?.requiredExp ?? 0) ? 'text-emerald-600' : 'text-slate-950'}`}>
-                                {app.matchScore?.yearsExp ?? 0}
-                              </p>
-                              <p className="text-[10px] text-slate-500">
-                                Required: {app.matchScore?.requiredExp ?? 0}
-                              </p>
-                            </div>
-                            
-                            {/* Education */}
-                            <div className={`p-3 rounded-xl border ${(app.matchScore?.eduScore ?? 0) >= 80 ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                              <div className="flex items-center gap-2 mb-1">
-                                <GraduationCap className={`w-4 h-4 ${(app.matchScore?.eduScore ?? 0) >= 80 ? 'text-emerald-600' : 'text-slate-950'}`} />
-                                <span className="text-[10px] font-semibold text-slate-950 uppercase">Education</span>
-                              </div>
-                              <p className={`text-xl font-bold ${(app.matchScore?.eduScore ?? 0) >= 80 ? 'text-emerald-600' : 'text-slate-950'}`}>
-                                {app.matchScore?.eduScore ?? 0}%
-                              </p>
-                              <p className="text-[10px] text-slate-500 truncate">
-                                {app.matchScore?.education || 'N/A'}
-                              </p>
-                            </div>
-                            
-                            {/* CV Keywords */}
-                            <div className={`p-3 rounded-xl border ${(app.matchScore?.cvKeywords?.length || 0) > 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                              <div className="flex items-center gap-2 mb-1">
-                                <FileText className={`w-4 h-4 ${(app.matchScore?.cvKeywords?.length || 0) > 0 ? 'text-emerald-600' : 'text-slate-950'}`} />
-                                <span className="text-[10px] font-semibold text-slate-950 uppercase">CV</span>
-                              </div>
-                              <p className={`text-xl font-bold ${(app.matchScore?.cvKeywords?.length || 0) > 0 ? 'text-emerald-600' : 'text-slate-950'}`}>
-                                {app.matchScore?.cvKeywords?.length || 0}
-                              </p>
-                              <p className="text-[10px] text-slate-500">Keywords</p>
-                            </div>
+                            <p className="text-[10px] text-slate-400">match</p>
                           </div>
                           
-                          {/* Skills Tags */}
-                          <div className="flex flex-wrap gap-2">
-                            {app.matchScore?.matchedSkills?.slice(0, 6).map((skill, idx) => (
-                              <span key={idx} className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs rounded-lg font-semibold flex items-center gap-1">
-                                <CheckCircle className="w-3 h-3" /> {skill}
-                              </span>
-                            ))}
-                            {app.matchScore?.missingSkills?.slice(0, 3).map((skill, idx) => (
-                              <span key={idx} className="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs rounded-lg font-semibold flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" /> {skill}
-                              </span>
-                            ))}
-                          </div>
-                          
-                           {/* Actions */}
-                          <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
-                            <div className="flex gap-2">
-                              <button onClick={() => { setShowApplicant?.(app); setShowAIMatchModal(false); }} className="px-4 py-2 bg-slate-950 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-all flex items-center gap-2">
-                                <Eye className="w-4 h-4" /> View Profile
-                              </button>
-                              <button 
-                                onClick={() => { setSchedulingApplicant(app); setShowScheduleModal(true); setShowAIMatchModal(false); }} 
-                                className="px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-sm font-semibold rounded-xl transition-all flex items-center gap-2"
-                              >
-                                <Calendar className="w-4 h-4" /> Schedule
-                              </button>
-                            </div>
-                            <button 
-                              onClick={() => openNotifyModal(app, 'approve')} 
-                              disabled={loadingActions[app._id] === 'approved'}
-                              className="px-4 py-2 bg-slate-100 hover:bg-emerald-100 text-slate-950 hover:text-emerald-700 text-sm font-semibold rounded-xl transition-all disabled:bg-emerald-100 disabled:text-emerald-700 flex items-center gap-2"
-                            >
-                              {loadingActions[app._id] === 'approved' ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 animate-spin" /> Approving...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="w-4 h-4" /> Approve
-                                </>
-                              )}
+                          {/* Actions */}
+                          <div className="flex gap-1.5">
+                            <button onClick={() => { setShowApplicant?.(app); setShowAIMatchModal(false); }} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg" title="View">
+                              <Eye className="w-4 h-4 text-slate-600" />
+                            </button>
+                            <button onClick={() => openNotifyModal(app, 'approve')} className="p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg" title="Approve">
+                              <CheckCircle className="w-4 h-4 text-white" />
                             </button>
                           </div>
+                        </div>
+                        
+                        {/* Skills */}
+                        <div className="flex flex-wrap gap-1.5 mt-3 ml-13">
+                          {app.matchScore?.matchedSkills?.slice(0, 4).map((skill, idx) => (
+                            <span key={idx} className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded font-medium">{skill}</span>
+                          ))}
+                          {app.matchScore?.missingSkills?.slice(0, 2).map((skill, idx) => (
+                            <span key={idx} className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded font-medium">{skill}</span>
+                          ))}
                         </div>
                       </div>
                     );

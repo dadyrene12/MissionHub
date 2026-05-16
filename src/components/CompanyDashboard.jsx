@@ -38,11 +38,11 @@ import { AnalyticsPage } from './companydashboard/AnalyticsPage';
 import { SettingsPage } from './companydashboard/SettingsPage';
 import AIScreeningPage from './companydashboard/AIScreeningPage';
 
-export default function CompanyDashboard({ user: propUser, token: propToken }) {
+export default function CompanyDashboard({ user: propUser, token: propToken, onLogout }) {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarHovered, setSidebarHovered] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [showPricing, setShowPricing] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
@@ -75,17 +75,15 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
     { id: 5, name: 'Application Rejected', subject: 'Application Update - {company}', body: 'Dear {name},\n\nThank you for your interest in our company and for taking the time to apply.\n\nAfter careful consideration, we have decided to proceed with other candidates whose qualifications more closely match our current needs.\n\nWe encourage you to apply for future positions that match your skills.\n\nBest regards,\nThe Hiring Team' },
   ]);
 
-  const showToast = (message, type = 'info') => setToast({ message, type });
+   const showToast = (message, type = 'info') => setToast({ message, type });
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
-    window.location.href = '/login';
+   const refreshData = async () => {
+    setLoading(true);
+    await fetchDataAsync();
+    showToast('Dashboard refreshed', 'success');
   };
 
-  const fetchDataAsync = async () => {
+   const fetchDataAsync = async () => {
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
     
     try {
@@ -120,20 +118,18 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
     }
 
     try {
-      const notifRes = await apiFetch('/notifications');
+      const notifRes = await apiFetch('/notifications/unread-count');
       if (notifRes.ok) {
-        const notifications = notifRes.data?.data || [];
-        setNotificationCount(notifications.filter(n => !n.read).length);
+        setNotificationCount(notifRes.data?.unreadCount || 0);
       }
     } catch (e) {
       console.error('Error fetching notifications:', e);
     }
 
     try {
-      const msgRes = await apiFetch('/messages');
+      const msgRes = await apiFetch('/messages/unread/count');
       if (msgRes.ok) {
-        const messages = msgRes.data?.data || [];
-        setUnreadMessages(messages.filter(m => !m.read && m.toUserId === user?._id).length);
+        setUnreadMessages(msgRes.data?.unreadCount || 0);
       }
     } catch (e) {
       console.error('Error fetching messages:', e);
@@ -147,7 +143,7 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(fetchDataAsync, 60000);
+    const interval = setInterval(fetchDataAsync, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -158,10 +154,25 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
       return;
     }
     
-    if (action === 'schedule_interview') {
-      showToast('Go to Interviews page to schedule', 'info');
+    if (action === 'schedule') {
+      showToast('Opening scheduling...', 'info');
       setCurrentPage('interviews');
       setShowApplicantDetail(null);
+      return;
+    }
+    
+    if (action === 'talentpool') {
+      try {
+        const res = await apiFetch('/talent-pool/add', {
+          method: 'POST',
+          body: JSON.stringify({ candidate: applicant.userId || applicant._id, source: 'application', notes: `From application for ${applicant.jobTitle}` })
+        });
+        if (res.ok) {
+          showToast('Added to talent pool!', 'success');
+        }
+      } catch (e) {
+        showToast('Failed to add to talent pool', 'error');
+      }
       return;
     }
     
@@ -270,7 +281,7 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
   };
 
   const colorMap = {
-    blue: { bg: 'bg-blue-50', activeBg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200', active: 'bg-blue-600' },
+    blue: { bg: 'bg-slate-50', activeBg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200', active: 'bg-slate-800' },
     emerald: { bg: 'bg-emerald-50', activeBg: 'bg-emerald-100', text: 'text-emerald-600', border: 'border-emerald-200', active: 'bg-emerald-600' },
     purple: { bg: 'bg-purple-50', activeBg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200', active: 'bg-purple-600' },
     amber: { bg: 'bg-amber-50', activeBg: 'bg-amber-100', text: 'text-amber-600', border: 'border-amber-200', active: 'bg-amber-600' },
@@ -311,10 +322,10 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
         setCollapsed={setSidebarCollapsed}
         hovered={sidebarHovered}
         setHovered={setSidebarHovered}
-        isMobileOpen={isMobileMenuOpen}
-        setIsMobileOpen={setIsMobileMenuOpen}
-        onLogout={handleLogout}
-        menuGroups={menuGroups}
+        isMobileOpen={isMobileOpen}
+        setIsMobileOpen={setIsMobileOpen}
+         onLogout={onLogout}
+         menuGroups={menuGroups}
         colorMap={colorMap}
         isPremium={isPremium}
         notificationCount={notificationCount}
@@ -328,18 +339,18 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
         unreadMessages={unreadMessages}
         onNavigate={handleQuickAction}
         sidebarCollapsed={sidebarCollapsed}
-        onLogout={handleLogout}
-        setIsMobileOpen={setIsMobileMenuOpen}
+        onLogout={onLogout}
+        setIsMobileOpen={setIsMobileOpen}
       />
       
       {/* Mobile Drawer */}
       <MobileDrawer 
         user={user}
         currentPage={currentPage}
-        onNavigate={(page) => { handleQuickAction(page); setIsMobileMenuOpen(false); }}
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-        onLogout={handleLogout}
+        onNavigate={(page) => { handleQuickAction(page); setIsMobileOpen(false); }}
+        isOpen={isMobileOpen}
+        onClose={() => setIsMobileOpen(false)}
+        onLogout={onLogout}
         menuGroups={menuGroups}
         colorMap={colorMap}
         notificationCount={notificationCount}
@@ -352,15 +363,15 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
       `}>
         <div className="p-4 lg:p-6 max-w-7xl mx-auto">
           {currentPage === 'dashboard' && <DashboardPage user={user} showToast={showToast} onUpgrade={() => setShowPricing(true)} isPremium={isPremium} onNavigate={(page) => { handleQuickAction(page); }} />}
-          {currentPage === 'jobs' && <JobsPage token={token} user={user} showToast={showToast} onViewApplicants={(job) => { setSelectedJobFilter(job); handleQuickAction('applicants'); }} />}
-          {currentPage === 'applicants' && <ApplicantsPage token={token} user={user} showToast={showToast} talentPool={talentPool} setTalentPool={setTalentPool} setShowApplicant={setShowApplicantDetail} setShowMessage={setShowMessageModal} setShowAIMatching={setShowAIMatching} jobs={jobs} filterJob={selectedJobFilter} />}
+          {currentPage === 'jobs' && <JobsPage token={token} user={user} showToast={showToast} onViewApplicants={(job) => { setSelectedJobFilter(job); handleQuickAction('applicants'); }} onRefresh={refreshData} />}
+          {currentPage === 'applicants' && <ApplicantsPage token={token} user={user} showToast={showToast} talentPool={talentPool} setTalentPool={setTalentPool} setShowApplicant={setShowApplicantDetail} setShowMessage={setShowMessageModal} setShowAIMatching={setShowAIMatching} jobs={jobs} filterJob={selectedJobFilter} onRefresh={refreshData} />}
           {currentPage === 'ai-screening' && <AIScreeningPage token={token} showNotification={showToast} user={user} />}
           {currentPage === 'interviews' && <InterviewsPage token={token} user={user} showToast={showToast} />}
           {currentPage === 'messages' && <MessagesPage token={token} user={user} showToast={showToast} templates={messageTemplates} setShowTemplates={setShowTemplates} />}
           {currentPage === 'notifications' && <NotificationsPage token={token} user={user} showToast={showToast} onNavigate={(page) => handleQuickAction(page)} />}
           {currentPage === 'talent' && <TalentPoolPage token={token} user={user} showToast={showToast} templates={messageTemplates} setTemplates={setMessageTemplates} />}
           {currentPage === 'analytics' && <AnalyticsPage token={token} user={user} showToast={showToast} />}
-          {currentPage === 'settings' && <SettingsPage user={user} showToast={showToast} templates={messageTemplates} setTemplates={setMessageTemplates} />}
+          {currentPage === 'settings' && <SettingsPage user={user} showToast={showToast} templates={messageTemplates} setTemplates={setMessageTemplates} onRefresh={refreshData} />}
           {currentPage === 'payments' && <PaymentsPage user={user} showToast={showToast} />}
         </div>
       </main>
@@ -371,7 +382,7 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
         onNavigate={(page) => { handleQuickAction(page); }}
         notificationCount={notificationCount}
         unreadMessages={unreadMessages}
-        onOpenMenu={() => setIsMobileMenuOpen(true)}
+        onOpenMenu={() => setIsMobileOpen(true)}
       />
       
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
@@ -381,6 +392,7 @@ export default function CompanyDashboard({ user: propUser, token: propToken }) {
         onClose={() => setShowApplicantDetail(null)} 
         applicant={showApplicantDetail} 
         onAction={handleApplicantAction}
+        showNotification={showToast}
       />
       <MessageTemplatesModal 
         isOpen={showTemplates} 

@@ -404,7 +404,7 @@ export const PostJobModal = ({
           {/* Job Image Upload Section */}
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-dashed border-blue-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <Camera className="w-5 h-5 mr-2 text-blue-600" />
+              <Camera className="w-5 h-5 mr-2 text-slate-700" />
               Job Featured Image
             </h3>
             
@@ -415,7 +415,12 @@ export const PostJobModal = ({
                     src={safeNewJob.image} 
                     alt="Job preview" 
                     className="w-full h-48 object-cover"
+                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling?.nextSibling?.classList.remove('hidden'); }}
                   />
+                  <div className="hidden h-48 bg-slate-100 flex items-center justify-center">
+                    <Image className="w-12 h-12 text-slate-400" />
+                    <span className="ml-2 text-sm text-slate-500">Image not available</span>
+                  </div>
                   <button
                     type="button"
                     onClick={removeImage}
@@ -445,7 +450,7 @@ export const PostJobModal = ({
                       Recommended: 800x400px (JPG, PNG, WebP)
                     </p>
                     {!uploading && (
-                      <div className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                      <div className="px-6 py-2 bg-slate-800 text-white rounded-lg font-semibold hover:bg-slate-900 transition-colors">
                         Choose Image
                       </div>
                     )}
@@ -465,7 +470,7 @@ export const PostJobModal = ({
             
             <div className="mt-4 p-3 bg-blue-100 rounded-lg">
               <div className="flex">
-                <Info className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
+                <Info className="w-4 h-4 text-slate-700 mr-2 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-blue-800">
                   A compelling image increases job visibility by up to 40%. Choose an image that represents your company culture or workplace.
                 </p>
@@ -619,7 +624,7 @@ export const PostJobModal = ({
                 type="checkbox"
                 checked={safeNewJob.remote}
                 onChange={(e) => handleNewJobChange('remote', e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-slate-700 focus:ring-blue-500 border-gray-300 rounded"
               />
               <label htmlFor="job-remote" className="ml-2 block text-sm text-gray-700">
                 Remote Position
@@ -631,7 +636,7 @@ export const PostJobModal = ({
                 type="checkbox"
                 checked={safeNewJob.urgent}
                 onChange={(e) => handleNewJobChange('urgent', e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-slate-700 focus:ring-blue-500 border-gray-300 rounded"
               />
               <label htmlFor="job-urgent" className="ml-2 block text-sm text-gray-700">
                 Urgent Hiring
@@ -886,7 +891,7 @@ export const DocumentShareModal = ({
           <div className="space-y-6">
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-dashed border-blue-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Upload className="w-5 h-5 mr-2 text-blue-600" />
+                <Upload className="w-5 h-5 mr-2 text-slate-700" />
                 Upload New Document
               </h3>
               
@@ -905,7 +910,7 @@ export const DocumentShareModal = ({
                       PDF, Word, Text, or Images (Max 10MB)
                     </p>
                     {!uploading && (
-                      <div className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                      <div className="px-6 py-2 bg-slate-800 text-white rounded-lg font-semibold hover:bg-slate-900 transition-colors">
                         Choose File
                       </div>
                     )}
@@ -932,7 +937,7 @@ export const DocumentShareModal = ({
             {/* User Search and Selection */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Users className="w-5 h-5 mr-2 text-blue-600" />
+                <Users className="w-5 h-5 mr-2 text-slate-700" />
                 Select Users to Share With
               </h3>
               
@@ -962,7 +967,7 @@ export const DocumentShareModal = ({
                         {user.name}
                         <button
                           onClick={() => toggleUserSelection(user)}
-                          className="ml-2 text-blue-600 hover:text-blue-800"
+                          className="ml-2 text-slate-700 hover:text-blue-800"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -999,7 +1004,7 @@ export const DocumentShareModal = ({
                       </div>
                       <div className={`w-5 h-5 border-2 rounded-full flex items-center justify-center ${
                         selectedUsers.some(u => u.id === user.id)
-                          ? 'bg-blue-600 border-blue-600'
+                          ? 'bg-slate-800 border-blue-600'
                           : 'border-gray-300'
                       }`}>
                         {selectedUsers.some(u => u.id === user.id) && (
@@ -1049,7 +1054,7 @@ export const DocumentShareModal = ({
           <div className="space-y-6">
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <FileText className="w-5 h-5 mr-2 text-blue-600" />
+                <FileText className="w-5 h-5 mr-2 text-slate-700" />
                 Your Documents ({userDocuments?.length || 0})
               </h3>
               
@@ -1058,7 +1063,7 @@ export const DocumentShareModal = ({
                   {userDocuments.map(doc => (
                     <div key={doc.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
                       <div className="flex items-center space-x-4">
-                        <FileText className="w-8 h-8 text-blue-600" />
+                        <FileText className="w-8 h-8 text-slate-700" />
                         <div>
                           <p className="font-semibold text-gray-900">{doc.name}</p>
                           <div className="flex items-center space-x-4 text-sm text-gray-500">
@@ -1076,7 +1081,7 @@ export const DocumentShareModal = ({
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => handlePreviewDocument(doc)}
-                          className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                          className="p-2 text-gray-400 hover:text-slate-700 transition-colors"
                           title="Preview"
                         >
                           <Eye className="w-4 h-4" />
@@ -1093,7 +1098,7 @@ export const DocumentShareModal = ({
                           className={`p-2 transition-colors ${
                             doc.shared 
                               ? 'text-green-600 hover:text-green-800' 
-                              : 'text-gray-400 hover:text-blue-600'
+                              : 'text-gray-400 hover:text-slate-700'
                           }`}
                           title={doc.shared ? 'Make Private' : 'Share Document'}
                         >
@@ -1171,7 +1176,7 @@ export const DocumentPreviewModal = ({ documentPreview, setDocumentPreview, hand
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex justify-between items-center p-4 border-b border-gray-200">
           <div className="flex items-center space-x-3">
-            <FileText className="w-5 h-5 text-blue-600" />
+            <FileText className="w-5 h-5 text-slate-700" />
             <h3 className="text-lg font-semibold text-gray-900">{documentPreview.name}</h3>
           </div>
           <div className="flex items-center space-x-2">
@@ -1215,7 +1220,7 @@ export const DocumentPreviewModal = ({ documentPreview, setDocumentPreview, hand
               <div className="mt-4 space-x-2">
                 <button
                   onClick={handleDownload}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors"
                 >
                   <ExternalLink className="w-4 h-4 inline mr-2" />
                   Open Full Document

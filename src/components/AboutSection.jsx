@@ -104,7 +104,7 @@ const AboutSection = ({ aboutStats }) => {
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
             <button 
-              onClick={() => window.location.href = '/register'}
+              onClick={() => window.location.hash = '/register'}
               className="group relative bg-slate-950 text-white px-8 py-3 rounded-xl font-medium text-sm border border-white/10 transition-all duration-300 hover:border-white/20 overflow-hidden"
             >
               <span className="flex items-center">
@@ -114,7 +114,7 @@ const AboutSection = ({ aboutStats }) => {
             </button>
             
             <button 
-              onClick={() => window.location.href = '/register'}
+              onClick={() => window.location.hash = '/register'}
               className="group relative bg-transparent text-white px-8 py-3 rounded-xl font-medium text-sm border border-white/10 transition-all duration-300 hover:border-white/20 overflow-hidden"
             >
               <span className="flex items-center">
@@ -198,6 +198,7 @@ const AboutSection = ({ aboutStats }) => {
                   src={partner.logo} 
                   alt={partner.name}
                   className="h-10 w-auto object-contain mb-3"
+                  onError={(e) => e.target.style.display = 'none'}
                 />
                 <span className="text-white text-sm font-medium text-center">{partner.name}</span>
               </div>

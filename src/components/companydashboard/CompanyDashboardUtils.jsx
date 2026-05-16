@@ -39,7 +39,7 @@ export const apiFetch = async (endpoint, options = {}, retries = 3) => {
         localStorage.removeItem('user');
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
-        window.location.href = '/login';
+        window.location.hash = '/login';
         return { ok: false, status: 401, data: { success: false, message: 'Session expired' } };
       }
       
@@ -108,7 +108,7 @@ export const Badge = ({ children, color = 'indigo' }) => {
     green: 'bg-green-500/20 text-green-400',
     red: 'bg-red-500/20 text-red-400',
     yellow: 'bg-yellow-500/20 text-yellow-400',
-    blue: 'bg-blue-500/20 text-blue-400',
+    blue: 'bg-slate-800/20 text-blue-400',
     purple: 'bg-purple-500/20 text-purple-400',
     pink: 'bg-pink-500/20 text-pink-400',
     gray: 'bg-slate-500/20 text-slate-400',
@@ -143,7 +143,7 @@ export const PDFViewer = ({ url, title = 'Document' }) => {
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
           <FileTextIcon className="w-16 h-16 text-slate-700 mb-4" />
           <p className="text-slate-500">Failed to load document</p>
-          <a href={url} download className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+          <a href={url} download className="mt-4 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-blue-600 transition-colors">
             Download
           </a>
         </div>
@@ -154,325 +154,296 @@ export const PDFViewer = ({ url, title = 'Document' }) => {
   );
 };
 
-// Applicant Detail Modal
-export function ApplicantDetailModal({ isOpen, onClose, applicant, onAction }) {
-  if (!isOpen || !applicant) return null;
+// Applicant Detail Modal - Clean White Design
+export function ApplicantDetailModal({ isOpen, onClose, applicant, onAction, showNotification }) {
+  const [loadingStates, setLoadingStates] = useState({
+    message: false,
+    schedule: false,
+    talentpool: false,
+    approved: false,
+    rejected: false
+  });
+  const [resumeError, setResumeError] = useState(false);
 
   const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'A';
 
-  const profile = applicant.userId?.profile || applicant.userId || {};
-  const user = applicant.userId || {};
+  if (!isOpen || !applicant) return null;
 
+  const user = applicant.userId || {};
+  const profile = user.profile || {};
+  
+  const userPhone = user.phone || profile?.phone || '';
+  const userLocation = user.city || profile?.location || profile?.location || '';
+  const userSkills = user.skills || profile?.skills || [];
+  const userExperience = user.experience || profile?.experience || '';
+  const userEducation = user.education || profile?.education || '';
+  const userBio = user.bio || profile?.bio || '';
+  const userResume = user.resume || profile?.resume?.url || profile?.resume || '';
+  
   const getResumeData = () => {
-    if (applicant.resume?.url) return applicant.resume;
-    if (applicant.userId?.profile?.resume?.url) return applicant.userId.profile.resume;
-    if (profile.resume?.url) return profile.resume;
-    if (user.resume?.url) return user.resume;
-    if (profile.profile?.resume?.url) return profile.profile.resume;
-    if (user.profile?.resume?.url) return user.profile.resume;
+    const appResume = applicant.resume;
+    const profileData = profile?.resume || profile?.cv || {};
+    const userResumeData = user.resume || user.cv || {};
+    if (typeof userResumeData === 'string' && userResumeData) return { name: userResumeData.split('/').pop() || 'Resume', url: userResumeData };
+    if (appResume && typeof appResume === 'string' && appResume) return { name: appResume.split('/').pop() || 'Resume', url: appResume };
+    if (appResume && (appResume.url || appResume.name)) return appResume;
+    if (userResumeData && (userResumeData.url || userResumeData.name)) return userResumeData;
+    if (profileData && (profileData.url || profileData.name)) return profileData;
+    if (applicant.cv && (applicant.cv.url || applicant.cv.name)) return applicant.cv;
+    if (applicant.coverLetter) return { name: 'Cover Letter', url: null, isCoverLetter: true, text: applicant.coverLetter };
     return null;
   };
 
   const resumeData = getResumeData();
 
-  const handleViewCV = () => {
-    if (resumeData?.url) {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const backendUrl = import.meta.env.MODE === "development" ? "http://localhost:5000" : 'https://missionhubbackend.onrender.com';
-      const fullUrl = `${backendUrl}${resumeData.url}${token ? `?token=${token}` : ''}`;
-      window.open(fullUrl, '_blank');
+  const handleViewCV = async () => {
+    if (!resumeData?.url) {
+      if (showNotification) showNotification('Resume file not available', 'error');
+      return;
     }
+    // Open URL directly - works for both R2 and local URLs
+    window.open(resumeData.url, '_blank');
   };
 
-  const handleDownloadCV = () => {
-    if (resumeData?.url) {
+  const handleDownloadCV = async () => {
+    if (!resumeData?.url) {
+      if (showNotification) showNotification('Resume file not available', 'error');
+      return;
+    }
+    // If it's an R2 URL, it may not have CORS for download, so open instead
+    if (resumeData.url.includes('dblivpykh') || resumeData.url.includes('workers.dev')) {
+      window.open(resumeData.url, '_blank');
+      return;
+    }
+    // For local URLs, try to download
+    try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       const backendUrl = import.meta.env.MODE === "development" ? "http://localhost:5000" : 'https://missionhubbackend.onrender.com';
-      const fullUrl = `${backendUrl}${resumeData.url}${token ? `?token=${token}` : ''}`;
+      const filename = resumeData.url.split('/').pop();
+      const fullUrl = `${backendUrl}/api/resume/${filename}?token=${token}`;
+      const res = await fetch(fullUrl);
+      if (!res.ok) {
+        if (showNotification) showNotification('Resume file not found', 'error');
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = fullUrl;
+      link.href = url;
       link.download = resumeData?.name || 'resume.pdf';
       link.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      // Fallback: open directly
+      window.open(resumeData.url, '_blank');
     }
   };
 
   const statusConfig = {
-    approved: { gradient: 'from-emerald-500 to-teal-500', badge: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
-    rejected: { gradient: 'from-red-500 to-rose-600', badge: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
-    reviewed: { gradient: 'from-blue-500 to-indigo-600', badge: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
-    pending: { gradient: 'from-amber-500 to-orange-500', badge: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
+    approved: { gradient: 'from-emerald-500 to-teal-500', badge: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', label: 'Approved', border: 'border-emerald-200' },
+    rejected: { gradient: 'from-red-500 to-rose-600', badge: 'bg-red-100 text-red-700', dot: 'bg-red-500', label: 'Rejected', border: 'border-red-200' },
+    reviewed: { gradient: 'from-blue-500 to-indigo-600', badge: 'bg-blue-100 text-blue-700', dot: 'bg-slate-800', label: 'Reviewed', border: 'border-blue-200' },
+    pending: { gradient: 'from-amber-500 to-orange-500', badge: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500', label: 'Pending', border: 'border-amber-200' },
   };
   const currentStatus = statusConfig[applicant.status] || statusConfig.pending;
 
   const skills = Array.isArray(applicant.skills) ? applicant.skills : 
-                 Array.isArray(profile.skills) ? profile.skills : 
-                 Array.isArray(user.skills) ? user.skills : [];
+               Array.isArray(profile.skills) ? profile.skills : 
+               Array.isArray(user.skills) ? user.skills : [];
   
   const experienceYears = typeof applicant.experience === 'object' ? applicant.experience.years : 
-                          typeof profile.experience === 'object' ? profile.experience.years :
-                          parseInt(applicant.experience || profile.experience || user.experience || 0);
+                        typeof profile.experience === 'object' ? profile.experience.years :
+                        parseInt(applicant.experience || profile.experience || user.experience || 0);
   
   const experienceSummary = typeof applicant.experience === 'object' ? applicant.experience.summary : 
-                            typeof profile.experience === 'object' ? profile.experience.summary :
-                            applicant.experience || profile.experience || user.experience || '';
-  
+                          typeof profile.experience === 'object' ? profile.experience.summary :
+                          applicant.experience || profile.experience || user.experience || '';
+
   const educationDegree = typeof applicant.education === 'object' ? applicant.education.degree :
-                         typeof profile.education === 'object' ? profile.education.degree :
-                         applicant.education || profile.education || user.education || '';
+                       typeof profile.education === 'object' ? profile.education.degree :
+                       applicant.education || profile.education || user.education || '';
   
   const phone = applicant.phone || profile.phone || user.phone || '';
   const location = applicant.location || profile.location || user.location || '';
-  const linkedIn = applicant.linkedIn || profile.linkedIn || user.linkedIn || '';
   const email = applicant.userId?.email || user.email || applicant.email || '';
   const name = applicant.userId?.name || user.name || applicant.name || 'Unknown';
+  const jobTitle = applicant.jobId?.title || applicant.jobTitle || 'Position';
+  const bio = applicant.userId?.bio || profile.bio || user.bio || '';
+
+  const handleAction = async (actionType, applicantData) => {
+    setLoadingStates(prev => ({ ...prev, [actionType]: true }));
+    try {
+      if (onAction) await onAction(actionType, applicantData);
+    } catch (error) {
+      console.error(`Error in ${actionType} action:`, error);
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [actionType]: false }));
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
-        {/* Header */}
-        <div className="relative bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-5 flex-shrink-0">
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-slate-700 to-transparent rounded-full opacity-30" />
-            <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-slate-700 to-transparent rounded-full opacity-30" />
-          </div>
-          
-          <div className="relative flex items-center justify-between">
+    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '92vh' }}>
+        
+        {/* Header - White */}
+        <div className="bg-white border-b border-slate-200 px-6 py-5">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${currentStatus.gradient} flex items-center justify-center text-white text-xl font-bold shadow-xl ring-4 ring-white/10`}>
+              <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-white text-xl font-black">
                 {getInitials(name)}
               </div>
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-xl font-bold text-white">{name}</h3>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${currentStatus.badge}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${currentStatus.dot}`} />
-                    {applicant.status?.charAt(0).toUpperCase() + applicant.status?.slice(1)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4 text-slate-400 text-sm">
-                  <span className="flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5" />
-                    {applicant.jobId?.title || applicant.jobTitle || 'Position'}
-                  </span>
-                  <span className="flex items-center gap-1.5">
+                <h3 className="text-xl font-bold text-slate-900">{name}</h3>
+                <p className="text-sm text-slate-600 font-medium">{jobTitle}</p>
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="flex items-center gap-1.5 text-slate-500 text-xs">
                     <Clock className="w-3.5 h-3.5" />
-                    {new Date(applicant.createdAt).toLocaleDateString()}
+                    Applied {new Date(applicant.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${currentStatus.badge}`}>
+                    {currentStatus.label}
                   </span>
                 </div>
               </div>
             </div>
-            <button onClick={onClose} className="w-9 h-9 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-all">
-              <X className="w-5 h-5 text-white" />
+            <button onClick={onClose} className="w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center transition-all">
+              <X className="w-5 h-5 text-slate-600" />
             </button>
           </div>
         </div>
 
-        {/* Body - Scrollable */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex flex-col lg:flex-row">
-            {/* Left Sidebar */}
-            <div className="w-full lg:w-72 bg-slate-50 border-r border-slate-200 p-5 space-y-4">
-              {/* Stats */}
-              <div className="grid grid-cols-3 lg:grid-cols-1 gap-2">
-                <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
-                  <div className="w-8 h-8 bg-slate-900 rounded-md flex items-center justify-center mx-auto mb-1.5">
-                    <Award className="w-4 h-4 text-white" />
-                  </div>
-                  <p className="text-lg font-bold text-slate-900">{skills.length}</p>
-                  <p className="text-[10px] text-slate-500">Skills</p>
-                </div>
-                <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
-                  <div className="w-8 h-8 bg-slate-900 rounded-md flex items-center justify-center mx-auto mb-1.5">
-                    <Briefcase className="w-4 h-4 text-white" />
-                  </div>
-                  <p className="text-lg font-bold text-slate-900">{experienceYears || 0}</p>
-                  <p className="text-[10px] text-slate-500">Years Exp.</p>
-                </div>
-                <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
-                  <div className="w-8 h-8 bg-slate-900 rounded-md flex items-center justify-center mx-auto mb-1.5">
-                    <Star className="w-4 h-4 text-white" />
-                  </div>
-                  <p className="text-sm font-bold text-slate-900 truncate">{educationDegree || 'N/A'}</p>
-                  <p className="text-[10px] text-slate-500">Education</p>
-                </div>
-              </div>
-
-              {/* Contact Info */}
-              <div className="bg-white rounded-lg p-4 border border-slate-200">
-                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-slate-500" /> Contact Info
-                </h4>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-7 h-7 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
-                      <Mail className="w-3.5 h-3.5 text-blue-600" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[9px] text-slate-400 uppercase">Email</p>
-                      <p className="text-xs text-slate-800 break-all">{email || 'Not provided'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-7 h-7 bg-emerald-100 rounded-md flex items-center justify-center flex-shrink-0">
-                      <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-slate-400 uppercase">Phone</p>
-                      <p className="text-xs text-slate-800">{phone || 'Not provided'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-7 h-7 bg-amber-100 rounded-md flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-3.5 h-3.5 text-amber-600" />
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-slate-400 uppercase">Location</p>
-                      <p className="text-xs text-slate-800">{location || 'Not provided'}</p>
-                    </div>
-                  </div>
-                  {linkedIn && (
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-7 h-7 bg-indigo-100 rounded-md flex items-center justify-center flex-shrink-0">
-                        <Globe className="w-3.5 h-3.5 text-indigo-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[9px] text-slate-400 uppercase">LinkedIn</p>
-                        <p className="text-xs text-slate-800 break-all">{linkedIn}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Resume */}
-              <div className="bg-white rounded-lg p-4 border border-slate-200">
-                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-slate-500" /> Resume
-                </h4>
-                {resumeData ? (
-                  <div className="space-y-2.5">
-                    <div className="flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-md border border-indigo-100">
-                      <div className="w-8 h-8 bg-indigo-500 rounded-md flex items-center justify-center flex-shrink-0">
-                        <FileText className="w-4 h-4 text-white" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-slate-900 truncate">{resumeData.name || 'Resume.pdf'}</p>
-                        <p className="text-[10px] text-slate-500">PDF Document</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={handleViewCV} className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs rounded-md font-medium flex items-center justify-center gap-1.5 transition-all">
-                        <Eye className="w-3 h-3" /> View
-                      </button>
-                      <button onClick={handleDownloadCV} className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-md font-medium flex items-center justify-center gap-1.5 transition-all border border-slate-200">
-                        <Download className="w-3 h-3" /> Download
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 p-2.5 bg-slate-100 rounded-md">
-                    <FileText className="w-4 h-4 text-slate-400" />
-                    <span className="text-xs text-slate-500">No resume attached</span>
-                  </div>
-                )}
-              </div>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 bg-white">
+          
+          {/* Stats Row */}
+          <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="bg-slate-50 rounded-xl p-4 text-center">
+              <p className="text-2xl font-black text-slate-900">{skills.length}</p>
+              <p className="text-xs text-slate-500 font-semibold uppercase">Skills</p>
             </div>
-
-            {/* Main Content */}
-            <div className="flex-1 p-5 space-y-4">
-              {/* Skills */}
-              {skills.length > 0 && (
-                <div className="bg-white rounded-lg p-4 border border-slate-200">
-                  <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
-                    <Award className="w-3.5 h-3.5 text-amber-500" /> Professional Skills
-                  </h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {skills.map((skill, idx) => (
-                      <span key={idx} className="px-2.5 py-1 bg-slate-900 text-white text-xs rounded-md font-medium">{skill}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Experience */}
-              <div className="bg-white rounded-lg p-4 border border-slate-200">
-                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
-                  <Briefcase className="w-3.5 h-3.5 text-blue-500" /> Work Experience
-                </h4>
-                {experienceSummary ? (
-                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{experienceSummary}</p>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">No experience details provided</p>
-                )}
-              </div>
-
-              {/* Education */}
-              <div className="bg-white rounded-lg p-4 border border-slate-200">
-                <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
-                  <GraduationCap className="w-3.5 h-3.5 text-purple-500" /> Education
-                </h4>
-                {educationDegree ? (
-                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{educationDegree}</p>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">No education details provided</p>
-                )}
-              </div>
-
-              {/* Cover Letter */}
-              {applicant.coverLetter && (
-                <div className="bg-white rounded-lg p-4 border border-slate-200">
-                  <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-emerald-500" /> Cover Letter
-                  </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{applicant.coverLetter}</p>
-                </div>
-              )}
-
-              {/* Additional Info */}
-              {applicant.aiScreening && (
-                <div className="bg-white rounded-lg p-4 border border-slate-200">
-                  <h4 className="text-xs font-bold text-slate-900 mb-3 flex items-center gap-1.5">
-                    <Brain className="w-3.5 h-3.5 text-violet-500" /> AI Screening
-                  </h4>
-                  <div className="p-3 bg-violet-50 rounded-md border border-violet-100">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-violet-700">Overall Score</p>
-                      <span className="text-sm font-bold text-violet-700">{applicant.aiScreening.overallScore || 0}%</span>
-                    </div>
-                    {applicant.aiScreening.summary && (
-                      <p className="text-xs text-violet-600">{applicant.aiScreening.summary}</p>
-                    )}
-                  </div>
-                </div>
-              )}
+            <div className="bg-slate-50 rounded-xl p-4 text-center">
+              <p className="text-2xl font-black text-slate-900">{experienceYears || 0}</p>
+              <p className="text-xs text-slate-500 font-semibold uppercase">Years Exp</p>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-4 text-center">
+              <p className="text-2xl font-black text-slate-900 truncate">{educationDegree ? educationDegree.split(' ')[0] : 'N/A'}</p>
+              <p className="text-xs text-slate-500 font-semibold uppercase">Education</p>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-4 text-center">
+              <p className="text-2xl font-black text-slate-900">{applicant.aiScreening ? applicant.aiScreening.overallScore || 0 : '--'}</p>
+              <p className="text-xs text-slate-500 font-semibold uppercase">AI Score</p>
             </div>
           </div>
+
+          {/* Bio */}
+          {bio && (
+            <div className="bg-slate-50 rounded-xl p-5 mb-6">
+              <h4 className="text-sm font-bold text-slate-900 mb-2">About</h4>
+              <p className="text-sm text-slate-600 leading-relaxed">{bio}</p>
+            </div>
+          )}
+
+          {/* Contact & Education */}
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <div className="bg-slate-50 rounded-xl p-5">
+              <h4 className="text-sm font-bold text-slate-900 mb-4">Contact</h4>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-slate-500">Email</p>
+                  <p className="text-sm text-slate-900 font-medium">{email || 'Not provided'}</p>
+                </div>
+                {phone && (<div><p className="text-xs text-slate-500">Phone</p><p className="text-sm text-slate-900 font-medium">{phone}</p></div>)}
+                {location && (<div><p className="text-xs text-slate-500">Location</p><p className="text-sm text-slate-900 font-medium">{location}</p></div>)}
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-5">
+              <h4 className="text-sm font-bold text-slate-900 mb-4">Education</h4>
+              {educationDegree ? <p className="text-sm text-slate-700">{educationDegree}</p> : <p className="text-sm text-slate-500 italic">Not provided</p>}
+            </div>
+          </div>
+
+          {/* Skills */}
+          {skills.length > 0 && (
+            <div className="bg-slate-50 rounded-xl p-5 mb-6">
+              <h4 className="text-sm font-bold text-slate-900 mb-4">Skills</h4>
+              <div className="flex flex-wrap gap-2">
+                {skills.map((skill, idx) => (<span key={idx} className="px-3 py-1.5 bg-slate-900 text-white text-sm rounded-lg">{skill}</span>))}
+              </div>
+            </div>
+          )}
+
+          {/* Experience */}
+          {experienceSummary && (
+            <div className="bg-slate-50 rounded-xl p-5 mb-6">
+              <h4 className="text-sm font-bold text-slate-900 mb-4">Experience</h4>
+              <p className="text-sm text-slate-700 leading-relaxed">{experienceSummary}</p>
+            </div>
+          )}
+
+          {/* Resume */}
+          {resumeData ? (
+            <div className="bg-slate-50 rounded-xl p-5 mb-6">
+              <h4 className="text-sm font-bold text-slate-900 mb-4">Resume</h4>
+              {resumeData.url ? (
+                <div className="flex gap-2">
+                  <button onClick={handleViewCV} className="flex-1 py-2.5 bg-slate-900 text-white text-sm rounded-xl font-semibold flex items-center justify-center gap-2">View</button>
+                  <button onClick={handleDownloadCV} className="flex-1 py-2.5 bg-emerald-600 text-white text-sm rounded-xl font-semibold flex items-center justify-center gap-2">Download</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-3 bg-slate-100 rounded-lg">
+                  <FileText className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <p className="text-sm text-slate-600">Cover letter on file</p>
+                    <p className="text-xs text-slate-400 line-clamp-2">{resumeData.text || applicant.coverLetter}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-slate-50 rounded-xl p-5 mb-6">
+              <h4 className="text-sm font-bold text-slate-900 mb-4">Resume</h4>
+              <div className="flex items-center gap-3 p-4 bg-slate-100 rounded-lg border border-dashed border-slate-300">
+                <FileText className="w-6 h-6 text-slate-400" />
+                <p className="text-sm text-slate-500">No resume attached</p>
+              </div>
+            </div>
+          )}
+
+          {/* AI Screening */}
+          {applicant.aiScreening && (
+            <div className="bg-slate-50 rounded-xl p-5 mb-6">
+              <h4 className="text-sm font-bold text-slate-900 mb-4">AI Score</h4>
+              <div className="text-3xl font-black text-slate-900">{applicant.aiScreening.overallScore || 0}%</div>
+              {applicant.aiScreening.summary && <p className="text-sm text-slate-600 mt-3">{applicant.aiScreening.summary}</p>}
+            </div>
+          )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="px-5 py-4 bg-slate-900 border-t border-slate-700 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <button onClick={() => onAction?.('message', applicant)} className="flex-1 py-2.5 bg-white hover:bg-slate-100 text-slate-900 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
-              <MessageSquare className="w-3.5 h-3.5" /> Message
+        {/* Footer */}
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200">
+          <div className="flex items-center gap-3">
+            <button onClick={() => handleAction('message', applicant)} disabled={loadingStates.message}
+              className="flex-1 py-3 bg-white hover:bg-slate-100 text-slate-900 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 border border-slate-200 disabled:opacity-50">
+              {loadingStates.message ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Message'}
             </button>
-            <button onClick={() => onAction?.('schedule', applicant)} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
-              <Calendar className="w-3.5 h-3.5" /> Schedule
+            <button onClick={() => handleAction('schedule', applicant)} disabled={loadingStates.schedule}
+              className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold text-sm disabled:opacity-50">
+              {loadingStates.schedule ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Schedule'}
             </button>
-            <button onClick={() => onAction?.('talentpool', applicant)} className="py-2.5 px-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all" title="Add to Talent Pool">
-              <UserPlus className="w-3.5 h-3.5" />
+            <button onClick={() => handleAction('approved', applicant)} disabled={loadingStates.approved}
+              className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm disabled:opacity-50">
+              {loadingStates.approved ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Approve'}
             </button>
-            <button onClick={() => onAction?.('approved', applicant)} className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
-              <CheckCircle className="w-3.5 h-3.5" /> Approve
-            </button>
-            <button onClick={() => onAction?.('rejected', applicant)} className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
-              <XCircle className="w-3.5 h-3.5" /> Reject
+            <button onClick={() => handleAction('rejected', applicant)} disabled={loadingStates.rejected}
+              className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold text-sm disabled:opacity-50">
+              {loadingStates.rejected ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Reject'}
             </button>
           </div>
         </div>
       </div>
     </div>
   );
-}
+};
 
 // Message Templates Modal
 export function MessageTemplatesModal({ isOpen, onClose, templates, onSelect }) {
@@ -697,7 +668,7 @@ export function AIMatchingModal({ isOpen, onClose, jobs, applications, onMatch }
 
   const getScoreColor = (score) => {
     if (score >= 85) return { text: 'text-emerald-600', bg: 'bg-emerald-500', light: 'bg-emerald-50', border: 'border-emerald-200' };
-    if (score >= 70) return { text: 'text-blue-600', bg: 'bg-blue-500', light: 'bg-blue-50', border: 'border-blue-200' };
+    if (score >= 70) return { text: 'text-blue-600', bg: 'bg-slate-800', light: 'bg-blue-50', border: 'border-blue-200' };
     if (score >= 50) return { text: 'text-amber-600', bg: 'bg-amber-500', light: 'bg-amber-50', border: 'border-amber-200' };
     return { text: 'text-slate-600', bg: 'bg-slate-500', light: 'bg-slate-50', border: 'border-slate-200' };
   };

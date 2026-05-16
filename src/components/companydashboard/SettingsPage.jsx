@@ -261,7 +261,7 @@ const EmailVerificationModal = ({ isOpen, onClose, onVerified, action, loading, 
   );
 };
 
-export const SettingsPage = ({ user, showToast }) => {
+export const SettingsPage = ({ user, showToast, onRefresh }) => {
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -406,6 +406,7 @@ export const SettingsPage = ({ user, showToast }) => {
       });
       if (res.ok && res.data?.success) {
         showToast('Company profile updated successfully!', 'success');
+        if (onRefresh) onRefresh();
       } else {
         showToast(res.data?.message || 'Failed to update profile', 'error');
       }
@@ -446,6 +447,7 @@ export const SettingsPage = ({ user, showToast }) => {
         if (res.ok && res.data?.success) {
           setCompanyData({ ...companyData, logo: base64 });
           showToast('Logo uploaded successfully!', 'success');
+          if (onRefresh) onRefresh();
         } else {
           showToast(res.data?.message || 'Failed to upload logo', 'error');
         }
@@ -536,7 +538,7 @@ export const SettingsPage = ({ user, showToast }) => {
         setTimeout(() => {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          window.location.href = '/login';
+          window.location.hash = '/login';
         }, 2000);
       } else {
         if (res.data?.message?.includes('Email verification required')) {
@@ -667,6 +669,7 @@ export const SettingsPage = ({ user, showToast }) => {
                     src={companyData.logo} 
                     alt="Company Logo" 
                     className="w-32 h-32 rounded-2xl object-cover shadow-md border-2 border-slate-200"
+                    onError={(e) => e.target.style.display = 'none'}
                   />
                 ) : (
                   <div className="w-32 h-32 bg-slate-200 rounded-2xl flex items-center justify-center text-4xl font-bold text-slate-950">

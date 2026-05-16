@@ -3,7 +3,7 @@ import {
   Search, RefreshCw, Mail, Trash2, Users2, Loader2, X, Send, 
   FileText, Edit3, Check, Copy, Bookmark, Plus, ChevronDown,
   Users, CheckSquare, Square, MailOpen, Bell, Eye, 
-  MoreHorizontal, UserPlus, Briefcase, MapPin, Calendar, Star, Award
+  MoreHorizontal, UserPlus, Briefcase, MapPin, Map, Calendar, Star, Award
 } from 'lucide-react';
 import { apiFetch, LoadingSpinner, Badge } from './CompanyDashboardUtils';
 
@@ -560,7 +560,7 @@ export const TalentPoolPage = ({ token, user, showToast, templates = [], setTemp
                     </div>
                   )}
                   
-                  {profile.experience?.length > 0 && (
+                  {profile.experience && Array.isArray(profile.experience) && profile.experience.length > 0 && (
                     <div className="flex items-center gap-2 text-xs text-slate-500 mb-4 bg-slate-50 px-3 py-2 rounded-xl">
                       <Briefcase className="w-3.5 h-3.5" />
                       <span>{profile.experience.length} experience{profile.experience.length !== 1 ? 's' : ''}</span>
@@ -626,7 +626,7 @@ export const TalentPoolPage = ({ token, user, showToast, templates = [], setTemp
               
               {candidateDetail.candidateId?.profile?.location && (
                 <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl mb-4">
-                  <MapPin className="w-5 h-5 text-slate-500" />
+                  <Map className="w-5 h-5 text-slate-500" />
                   <div>
                     <p className="text-xs text-slate-500">Location</p>
                     <p className="font-medium text-slate-950">{candidateDetail.candidateId.profile.location}</p>
@@ -653,7 +653,7 @@ export const TalentPoolPage = ({ token, user, showToast, templates = [], setTemp
                 </div>
               )}
               
-              {candidateDetail.candidateId?.profile?.experience?.length > 0 && (
+              {candidateDetail.candidateId?.profile?.experience && Array.isArray(candidateDetail.candidateId.profile.experience) && candidateDetail.candidateId.profile.experience.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                     <Briefcase className="w-4 h-4 text-slate-500" />
